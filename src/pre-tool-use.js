@@ -9,6 +9,7 @@ import {
   resolveProjectRoot,
 } from './config.js';
 import { extractWriteSnippets } from './inspect.js';
+import { collectCapabilities, parseBash } from './parser/bash.js';
 import { evaluate } from './policy/engine.js';
 import { compilePreToolPolicy } from './policy/rules.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
@@ -19,13 +20,17 @@ export function evaluatePreToolUse(payload, config = CONFIG, projectRoot = proce
   }
 
   const toolInput = payload.tool_input || {};
+  const command = toolInput.command || '';
+  const parsed = payload.tool_name === 'Bash' ? parseBash(command) : [];
   const ctx = {
     toolName: payload.tool_name,
     toolInput,
     projectRoot,
     filePaths: extractFilePaths(payload.tool_name, toolInput),
-    command: toolInput.command || '',
+    command,
     snippets: isWriteTool(payload.tool_name) ? extractWriteSnippets(toolInput) : [],
+    commands: parsed,
+    capabilities: collectCapabilities(parsed),
   };
 
   const decision = evaluate(ctx, compilePreToolPolicy(config));
