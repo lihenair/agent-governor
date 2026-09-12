@@ -163,6 +163,22 @@ npx agent-governor init --lang python   # 可选：只用标准库 ast
 
 可复制 [`governor.config.example.json`](./governor.config.example.json)。
 
+默认是**并集**：你写的 `protectedFiles` 会加到内置名单上，不能靠省略来拿掉 `tsconfig.json`。
+
+| 字段 | 语义 |
+| --- | --- |
+| `protectedFiles`（无开关） | 与默认并集 |
+| `unprotect` | 从合并后的名单里减去，例如 `["tsconfig.json"]` 之后该文件可写 |
+| `override: true` | 完全替换默认名单，只用你提供的数组 |
+
+`unprotect` 是只减不增；`override` 是丢掉默认。
+
+```json
+{
+  "unprotect": ["tsconfig.json"]
+}
+```
+
 ---
 
 ## 📊 性能

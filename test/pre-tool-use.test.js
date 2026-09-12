@@ -171,4 +171,28 @@ describe('mergeConfig', () => {
     );
     assert.equal(result.exitCode, 2);
   });
+
+  it('removes defaults listed in unprotect', () => {
+    const merged = mergeConfig(CONFIG, { unprotect: ['tsconfig.json'] });
+    assert.equal(merged.protectedFiles.includes('tsconfig.json'), false);
+    assert.ok(merged.protectedFiles.includes('package.json'));
+    const result = evaluatePreToolUse(
+      {
+        tool_name: 'Write',
+        tool_input: { file_path: '/repo/tsconfig.json', content: '{}' },
+      },
+      merged,
+      '/repo'
+    );
+    assert.equal(result.exitCode, 0);
+  });
+
+  it('replaces default lists when override is true', () => {
+    const merged = mergeConfig(CONFIG, {
+      override: true,
+      protectedFiles: ['only-me.lock'],
+    });
+    assert.deepEqual(merged.protectedFiles, ['only-me.lock']);
+    assert.equal(merged.protectedFiles.includes('tsconfig.json'), false);
+  });
 });

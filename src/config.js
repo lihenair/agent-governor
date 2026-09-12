@@ -130,32 +130,35 @@ function normalizePattern(pattern) {
 }
 
 export function mergeConfig(base, override = {}) {
-  const astRules = {
-    ...base.astRules,
-    ...(override.astRules || {}),
+  const replace = override.override === true;
+  const astRules = replace
+    ? { ...(override.astRules || base.astRules || {}) }
+    : {
+        ...base.astRules,
+        ...(override.astRules || {}),
+      };
+
+  const mergeList = (key) => {
+    if (replace && Object.prototype.hasOwnProperty.call(override, key)) {
+      return unique(override[key] || []);
+    }
+    return unique([...(base[key] || []), ...(override[key] || [])]);
   };
+
+  const unprotect = new Set(override.unprotect || []);
+  const protectedFiles = mergeList('protectedFiles').filter((name) => !unprotect.has(name));
+
+  const forbidden = replace && Object.prototype.hasOwnProperty.call(override, 'forbiddenBashPatterns')
+    ? override.forbiddenBashPatterns || []
+    : [...(base.forbiddenBashPatterns || []), ...(override.forbiddenBashPatterns || [])];
 
   return {
     ...base,
     ...override,
-    protectedFiles: unique([
-      ...(base.protectedFiles || []),
-      ...(override.protectedFiles || []),
-    ]),
-    protectedDirectories: unique([
-      ...(base.protectedDirectories || []),
-      ...(override.protectedDirectories || []),
-    ]),
-    codeExtensions: unique([
-      ...(base.codeExtensions || []),
-      ...(override.codeExtensions || []),
-    ]),
-    forbiddenBashPatterns: [
-      ...(base.forbiddenBashPatterns || []),
-      ...(override.forbiddenBashPatterns || []),
-    ]
-      .map(normalizePattern)
-      .filter(Boolean),
+    protectedFiles,
+    protectedDirectories: mergeList('protectedDirectories'),
+    codeExtensions: mergeList('codeExtensions'),
+    forbiddenBashPatterns: forbidden.map(normalizePattern).filter(Boolean),
     astRules,
   };
 }
