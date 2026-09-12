@@ -11,6 +11,7 @@ import {
   resolveProjectRoot,
 } from './config.js';
 import { extractWriteSnippets, formatInspectBlock, inspectSource } from './inspect.js';
+import { ensureSelfProtect, mergeProtectResult } from './self-protect.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
 function blockMessage(body) {
@@ -105,13 +106,15 @@ export async function runPreToolUseGuard({
   load = loadConfig,
 } = {}) {
   const payload = await readStdin(stdin);
-  if (!payload || !payload.tool_name) {
-    return { exitCode: 0 };
-  }
-
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
-  return evaluatePreToolUse(payload, config, projectRoot);
+  const protect = ensureSelfProtect(projectRoot, { failureMode: config.failureMode });
+
+  if (!payload || !payload.tool_name) {
+    return mergeProtectResult(protect, { exitCode: 0 });
+  }
+
+  return mergeProtectResult(protect, evaluatePreToolUse(payload, config, projectRoot));
 }
 
 async function main() {
