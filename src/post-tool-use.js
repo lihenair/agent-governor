@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG, extractFilePaths, isWriteTool, loadConfig, resolveProjectRoot } from './config.js';
 import { formatInspectBlock, inspectAST, inspectSource } from './inspect.js';
+import { logGuardDecision } from './audit/logger.js';
 import { ensureSelfProtect, mergeProtectResult } from './self-protect.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
@@ -57,13 +58,23 @@ export async function runPostToolUseGuard({
   const payload = await readStdin(stdin);
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
+  const started = Date.now();
   const protect = ensureSelfProtect(projectRoot, { failureMode: config.failureMode });
 
+  let result;
   if (!payload || !payload.tool_name) {
-    return mergeProtectResult(protect, { exitCode: 0 });
+    result = mergeProtectResult(protect, { exitCode: 0 });
+  } else {
+    result = mergeProtectResult(protect, evaluatePostToolUse(payload, config, io));
   }
 
-  return mergeProtectResult(protect, evaluatePostToolUse(payload, config, io));
+  logGuardDecision(payload, result, {
+    repoRoot: projectRoot,
+    hook: 'PostToolUse',
+    duration_ms: Date.now() - started,
+    failure_mode: config.failureMode || 'open',
+  });
+  return result;
 }
 
 async function main() {

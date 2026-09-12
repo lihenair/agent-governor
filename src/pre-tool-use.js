@@ -11,6 +11,7 @@ import {
   resolveProjectRoot,
 } from './config.js';
 import { extractWriteSnippets, formatInspectBlock, inspectSource } from './inspect.js';
+import { logGuardDecision } from './audit/logger.js';
 import { ensureSelfProtect, mergeProtectResult } from './self-protect.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
@@ -108,13 +109,23 @@ export async function runPreToolUseGuard({
   const payload = await readStdin(stdin);
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
+  const started = Date.now();
   const protect = ensureSelfProtect(projectRoot, { failureMode: config.failureMode });
 
+  let result;
   if (!payload || !payload.tool_name) {
-    return mergeProtectResult(protect, { exitCode: 0 });
+    result = mergeProtectResult(protect, { exitCode: 0 });
+  } else {
+    result = mergeProtectResult(protect, evaluatePreToolUse(payload, config, projectRoot));
   }
 
-  return mergeProtectResult(protect, evaluatePreToolUse(payload, config, projectRoot));
+  logGuardDecision(payload, result, {
+    repoRoot: projectRoot,
+    hook: 'PreToolUse',
+    duration_ms: Date.now() - started,
+    failure_mode: config.failureMode || 'open',
+  });
+  return result;
 }
 
 async function main() {
