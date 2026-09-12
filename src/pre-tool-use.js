@@ -11,6 +11,7 @@ import {
   resolveProjectRoot,
 } from './config.js';
 import { extractWriteSnippets, formatInspectBlock, inspectSource } from './inspect.js';
+import { protectedWriteViaBash } from './bash-write.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
 function blockMessage(body) {
@@ -76,6 +77,17 @@ export function evaluatePreToolUse(payload, config = CONFIG, projectRoot = proce
           ),
         };
       }
+    }
+
+    const viaArgv = protectedWriteViaBash(command, config, projectRoot);
+    if (viaArgv) {
+      return {
+        exitCode: 2,
+        stderr: blockMessage(
+          `You are prohibited from editing protected configuration file "${viaArgv}" via Bash.\n` +
+            `Fix the underlying source code issues instead of tampering with build/lint/typecheck configurations.`
+        ),
+      };
     }
 
     const writeLike =
