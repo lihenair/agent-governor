@@ -75,14 +75,33 @@ Claude Code 通过 stdin 以 JSON 传入事件（`tool_name`、`tool_input`、`c
 
 ## ✨ 特性
 
-* 🛡️ **零信任配置盾**：锁定 `tsconfig.json`、`package.json`、`pyproject.toml`、`Cargo.toml`、`go.mod`、`pubspec.yaml`、Gradle/Podfile、`governor.config.json` 以及 `.claude/`。
-* ⚡ **多语言 AST / 语法门禁**：
-  * **Node.js / TS** — `@babel/parser`
-  * **Python** — 仅标准库 `ast`（零 pip 依赖，拦截 `eval`/`exec`/废弃导入）
-  * **Rust / Go / C++ / Flutter** — 小于 15ms 的 Shell 规则（禁止 `unsafe` / 裸 `panic()`）
-* 🚨 **确定性拦截**：用进程退出码 `2` 把阻断原因写回 Agent 上下文。
-* 🚀 **启动快**：打包后的 JS 引擎、零依赖 Python、以及轻量 Bash Native 门禁。
-* 🧩 **共享策略文件**：所有运行时读取同一份 `governor.config.json`。
+* 🛡️ **零信任配置盾**：覆盖 JS / Python / Rust / Go / Flutter / iOS / Android 的清单文件。
+* ⚡ **单一调度器**：默认只挂一条 Pre + 一条 Post Hook，按文件扩展名分发检查。
+* 🧠 **`astRules` 真正生效**：JSON 里的开关会驱动拦截，而不是写着好看。
+* 🪟 **默认 Windows 可用**：主路径是 Node；Bash / Python 运行时是可选的。
+* 📎 **Cursor 软适配**：`init` 会写入 `.cursor/rules/agent-governor.mdc`（Cursor 没有 PreToolUse）。
+
+### 语言覆盖
+
+| 语言 | 配置盾 | 源码策略 | 引擎 |
+| --- | --- | --- | --- |
+| JS / TS | `package.json`、`tsconfig.json` | `eval` / `new Function()` | Babel AST |
+| Python | `pyproject.toml` 等 | `eval`/`exec`、废弃导入 | Node 快路径；`--lang python` 用标准库 `ast` |
+| Rust | `Cargo.toml` | `unsafe {`（默认开） | 正则 |
+| Go | `go.mod` | `panic(`（**默认关**） | 正则 |
+| Dart / Flutter | `pubspec.yaml` | `dart:mirrors` | 正则 |
+| Swift / iOS | `Podfile`、`Package.swift` | `try!` / `as!` | 正则 |
+| Kotlin / Android | Gradle / Manifest | `!!` / `TODO()` | 正则 |
+| Java | Gradle | `Runtime.exec()` | 正则 |
+| C / C++ | CMake / Makefile | `gets()` / `system()` | 正则 |
+
+### IDE
+
+| 工具 | 强制力 | `init` 做什么 |
+| --- | --- | --- |
+| Claude Code | 硬拦截，exit 2 | 写 dispatcher Hook |
+| Cursor | 软约束 | 写 `.cursor/rules/agent-governor.mdc` |
+| OpenCode | 无内置 Hook | 自行把 JSON 管道接到 `npx agent-governor hook` |
 
 ---
 
@@ -90,15 +109,11 @@ Claude Code 通过 stdin 以 JSON 传入事件（`tool_name`、`tool_input`、`c
 
 ```bash
 npm install -D agent-governor
-npx agent-governor init              # 自动识别 Node / Python / Rust / Go / Flutter
-npx agent-governor init --lang python
-npx agent-governor init --lang native
-npx agent-governor init --lang all
+npx agent-governor init                 # 一条 dispatcher，覆盖全部语言
+npx agent-governor init --lang python   # 可选：只用标准库 ast
 ```
 
-`init` 会写入共享的 `governor.config.json`，把零依赖运行时复制到 `.agent-governor/`，并注入对应 Hook。
-
-### Node.js / TypeScript
+默认 Hook：
 
 ```json
 {
@@ -108,46 +123,18 @@ npx agent-governor init --lang all
         "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
         "hooks": [{ "type": "command", "command": "npx agent-governor pre-check" }]
       }
-    ]
-  }
-}
-```
-
-### Python（仅标准库 `ast`，无需 pip 包）
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|Bash",
-        "hooks": [{ "type": "command", "command": "python3 .agent-governor/python/pre_tool_use.py" }]
-      }
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write",
-        "hooks": [{ "type": "command", "command": "python3 .agent-governor/python/post_tool_use.py" }]
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [{ "type": "command", "command": "npx agent-governor post-check" }]
       }
     ]
   }
 }
 ```
 
-### Native / 多语言（Rust、Go、C/C++、Flutter、iOS、Android）
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|Bash",
-        "hooks": [{ "type": "command", "command": "bash .agent-governor/native/governor_guard.sh" }]
-      }
-    ]
-  }
-}
-```
+也可以只用 `npx agent-governor hook`（读取 `hook_event_name`）。
 
 ---
 
@@ -192,7 +179,8 @@ npx agent-governor init --lang all
 ## 🧪 CLI
 
 ```bash
-npx agent-governor init --lang auto
+npx agent-governor init
+npx agent-governor hook
 npx agent-governor pre-check
 npx agent-governor post-check
 npx agent-governor version

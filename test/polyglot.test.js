@@ -132,8 +132,12 @@ describe('Native runtime', () => {
     assert.match(result.stderr, /unsafe/);
   });
 
-  it('blocks Go panic from existing file (PostToolUse style)', () => {
+  it('blocks Go panic from existing file when enabled', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gov-nat-go-'));
+    fs.writeFileSync(
+      path.join(tmp, 'governor.config.json'),
+      JSON.stringify({ astRules: { goForbidPanic: true } })
+    );
     const filePath = path.join(tmp, 'main.go');
     fs.writeFileSync(filePath, 'package main\nfunc init() { panic("nope") }\n');
     const result = runNative(

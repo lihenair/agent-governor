@@ -15,15 +15,14 @@ npm test
 
 | Path | Role |
 | --- | --- |
-| `src/config.js` | Default rules + `governor.config.json` loader |
-| `src/pre-tool-use.js` | Node PreToolUse config shield and bash safety |
-| `src/post-tool-use.js` | Node PostToolUse Babel AST inspection |
-| `python/pre_tool_use.py` | Zero-dep Python PreToolUse guard |
-| `python/post_tool_use.py` | stdlib `ast` inspector (`eval`/`exec`/deprecated imports) |
-| `native/governor_guard.sh` | Fast Rust/Go/C++/Flutter/iOS/Android guard |
-| `src/init.js` | `.claude/settings.json` + `.agent-governor/` injection |
-| `bin/governor.js` | CLI (`init --lang`, `pre-check`, `post-check`) |
-| `test/` | Node.js built-in test runner (spawns Python/Bash runtimes) |
+| `src/inspect.js` | Extension → language inspector dispatcher |
+| `src/dispatch.js` | `hook` command (Pre vs Post via `hook_event_name`) |
+| `src/pre-tool-use.js` | Config shield, bash safety, pre-write source policy |
+| `src/post-tool-use.js` | On-disk source policy after Write/Edit |
+| `python/` | Optional stdlib-`ast` runtime (`--lang python`) |
+| `native/` | Optional Bash fallback |
+| `adapters/cursor-rule.mdc` | Soft Cursor rule copied by `init` |
+| `bin/governor.js` | CLI |
 
 ## Pull requests
 

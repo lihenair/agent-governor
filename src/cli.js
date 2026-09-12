@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { initProject, parseLangFlag } from './init.js';
+import { runHookGuard } from './dispatch.js';
 import { runPostToolUseGuard } from './post-tool-use.js';
 import { runPreToolUseGuard } from './pre-tool-use.js';
 import { emitBlock, exitAllow, exitBlock } from './stdin.js';
@@ -32,16 +33,22 @@ Usage:
 
 Commands:
   init [--lang auto|all|node|python|native]
-               Detect the stack and inject Claude Code hooks
-  pre-check    Run the Node PreToolUse guard (stdin JSON)
-  post-check   Run the Node PostToolUse AST guard (stdin JSON)
+               Detect the stack and inject a single dispatcher hook
+  hook         Auto Pre/Post dispatcher (reads hook_event_name from stdin)
+  pre-check    Run the PreToolUse guard (stdin JSON)
+  post-check   Run the PostToolUse source guard (stdin JSON)
   version      Print the package version
   help         Show this message
 `;
 
 
 async function runGuard(kind) {
-  const runner = kind === 'pre' ? runPreToolUseGuard : runPostToolUseGuard;
+  const runner =
+    kind === 'post'
+      ? runPostToolUseGuard
+      : kind === 'hook'
+        ? runHookGuard
+        : runPreToolUseGuard;
   try {
     const result = await runner();
     if (result.stderr) {
@@ -74,6 +81,9 @@ export async function runCli(argv = process.argv.slice(2)) {
       exitAllow();
       break;
     }
+    case 'hook':
+      await runGuard('hook');
+      break;
     case 'pre-check':
     case 'pre':
       await runGuard('pre');

@@ -1,6 +1,8 @@
 export { CONFIG, loadConfig, mergeConfig, toJsonConfig } from './config.js';
 export { evaluatePreToolUse, runPreToolUseGuard } from './pre-tool-use.js';
 export { evaluatePostToolUse, inspectAST, runPostToolUseGuard } from './post-tool-use.js';
+export { inspectSource, languageIdFor } from './inspect.js';
+export { evaluateHook, runHookGuard } from './dispatch.js';
 export {
   detectLanguages,
   initProject,
@@ -13,8 +15,15 @@ export {
  * @property {boolean} [noDirectEval]
  * @property {boolean} [noNewFunction]
  * @property {boolean} [requireErrorBoundary]
- * @property {string[]} [forbiddenCallNames]
- * @property {string[]} [forbiddenIdentifiers]
+ * @property {boolean} [rustForbidUnsafe]
+ * @property {boolean} [goForbidPanic]
+ * @property {boolean} [dartForbidMirrors]
+ * @property {boolean} [swiftForbidForceTry]
+ * @property {boolean} [kotlinForbidBangBang]
+ * @property {boolean} [cppForbidUnsafeC]
+ * @property {boolean} [javaForbidRuntimeExec]
+ * @property {string[]} [pythonForbiddenCalls]
+ * @property {string[]} [pythonDeprecatedImports]
  */
 
 /**
