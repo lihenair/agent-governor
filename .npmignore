@@ -1,0 +1,7 @@
+test/
+scripts/
+.git/
+.gitignore
+.github/
+docs/demo.svg
+CONTRIBUTING.md
