@@ -255,21 +255,18 @@ export function isProtectedDirectory(targetFilePath, config = CONFIG, projectRoo
 
   const resolved = path.resolve(projectRoot, targetFilePath);
   const relative = path.relative(projectRoot, resolved);
-  const normalized = relative.split(path.sep).join('/');
-  const absoluteNormalized = resolved.split(path.sep).join('/');
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    return false;
+  }
 
-  return config.protectedDirectories.some((dir) => {
+  const normalized = relative.split(path.sep).join('/');
+
+  return (config.protectedDirectories || []).some((dir) => {
     const trimmed = dir.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     if (!trimmed) {
       return false;
     }
 
-    return (
-      normalized === trimmed ||
-      normalized.startsWith(`${trimmed}/`) ||
-      normalized.includes(`/${trimmed}/`) ||
-      absoluteNormalized.includes(`/${trimmed}/`) ||
-      absoluteNormalized.endsWith(`/${trimmed}`)
-    );
+    return normalized === trimmed || normalized.startsWith(`${trimmed}/`);
   });
 }
