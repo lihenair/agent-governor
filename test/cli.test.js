@@ -32,13 +32,39 @@ describe('init', () => {
     assert.equal(merged.hooks.PostToolUse.length, 1);
   });
 
-  it('writes .claude/settings.json and governor.config.cjs', () => {
+  it('writes .claude/settings.json and governor.config.json', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-init-'));
-    const result = initProject(tmp);
+    const result = initProject(tmp, { lang: 'node', packageRoot: repoRoot });
     assert.ok(fs.existsSync(result.settingsPath));
     assert.ok(fs.existsSync(result.configPath));
     const settings = JSON.parse(fs.readFileSync(result.settingsPath, 'utf8'));
     assert.match(settings.hooks.PreToolUse[0].hooks[0].command, /pre-check/);
+    assert.ok(result.configPath.endsWith('governor.config.json'));
+  });
+
+  it('copies Python runtime and wires python hooks', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-py-'));
+    fs.writeFileSync(path.join(tmp, 'pyproject.toml'), '[project]\nname="demo"\n');
+    const result = initProject(tmp, { lang: 'python', packageRoot: repoRoot });
+    assert.deepEqual(result.langs, ['python']);
+    assert.ok(fs.existsSync(path.join(tmp, '.agent-governor/python/pre_tool_use.py')));
+    assert.ok(fs.existsSync(path.join(tmp, '.agent-governor/python/post_tool_use.py')));
+    const settings = JSON.parse(fs.readFileSync(result.settingsPath, 'utf8'));
+    const commands = settings.hooks.PreToolUse.flatMap((group) =>
+      group.hooks.map((hook) => hook.command)
+    );
+    assert.ok(commands.some((command) => command.includes('pre_tool_use.py')));
+    assert.ok(!commands.some((command) => command.includes('pre-check')));
+  });
+
+  it('auto-detects a polyglot repo', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-poly-'));
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"demo"}');
+    fs.writeFileSync(path.join(tmp, 'Cargo.toml'), '[package]\nname="demo"\n');
+    const result = initProject(tmp, { lang: 'auto', packageRoot: repoRoot });
+    assert.ok(result.langs.includes('node'));
+    assert.ok(result.langs.includes('native'));
+    assert.ok(fs.existsSync(path.join(tmp, '.agent-governor/native/governor_guard.sh')));
   });
 });
 

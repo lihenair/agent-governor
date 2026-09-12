@@ -15,12 +15,15 @@ npm test
 
 | Path | Role |
 | --- | --- |
-| `src/config.js` | Default rules + `governor.config.*` loader |
-| `src/pre-tool-use.js` | PreToolUse config shield and bash safety |
-| `src/post-tool-use.js` | PostToolUse AST / syntax inspection |
-| `src/init.js` | `.claude/settings.json` hook injection |
-| `bin/governor.js` | CLI (`init`, `pre-check`, `post-check`) |
-| `test/` | Node.js built-in test runner |
+| `src/config.js` | Default rules + `governor.config.json` loader |
+| `src/pre-tool-use.js` | Node PreToolUse config shield and bash safety |
+| `src/post-tool-use.js` | Node PostToolUse Babel AST inspection |
+| `python/pre_tool_use.py` | Zero-dep Python PreToolUse guard |
+| `python/post_tool_use.py` | stdlib `ast` inspector (`eval`/`exec`/deprecated imports) |
+| `native/governor_guard.sh` | Fast Rust/Go/C++/Flutter/iOS/Android guard |
+| `src/init.js` | `.claude/settings.json` + `.agent-governor/` injection |
+| `bin/governor.js` | CLI (`init --lang`, `pre-check`, `post-check`) |
+| `test/` | Node.js built-in test runner (spawns Python/Bash runtimes) |
 
 ## Pull requests
 

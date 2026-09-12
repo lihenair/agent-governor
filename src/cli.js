@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { initProject } from './init.js';
+import { initProject, parseLangFlag } from './init.js';
 import { runPostToolUseGuard } from './post-tool-use.js';
 import { runPreToolUseGuard } from './pre-tool-use.js';
 import { emitBlock, exitAllow, exitBlock } from './stdin.js';
@@ -31,9 +31,10 @@ Usage:
   npx agent-governor <command>
 
 Commands:
-  init         Inject PreToolUse / PostToolUse hooks into .claude/settings.json
-  pre-check    Run the PreToolUse guard (reads Claude Code JSON from stdin)
-  post-check   Run the PostToolUse AST guard (reads Claude Code JSON from stdin)
+  init [--lang auto|all|node|python|native]
+               Detect the stack and inject Claude Code hooks
+  pre-check    Run the Node PreToolUse guard (stdin JSON)
+  post-check   Run the Node PostToolUse AST guard (stdin JSON)
   version      Print the package version
   help         Show this message
 `;
@@ -63,11 +64,12 @@ export async function runCli(argv = process.argv.slice(2)) {
 
   switch (command) {
     case 'init': {
-      const result = initProject(process.cwd());
+      const lang = parseLangFlag(argv.slice(1));
+      const result = initProject(process.cwd(), { lang });
       process.stdout.write(
-        `[Agent Governor] Initialized.\n` +
+        `[Agent Governor] Initialized for: ${result.langs.join(', ')}\n` +
           result.created.map((file) => `  + ${file}`).join('\n') +
-          `\nHooks are now bound in .claude/settings.json\n`
+          `\nShared policy: governor.config.json\n`
       );
       exitAllow();
       break;

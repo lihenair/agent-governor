@@ -12,6 +12,9 @@
 [![Claude Code Support](https://img.shields.io/badge/Claude%20Code-v1.0%2B-brightgreen.svg)](#)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/lihenair/agent-governor/pulls)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-green.svg)](#)
+[![Python](https://img.shields.io/badge/Python-3.9%2B%20zero--dep-3776AB.svg)](#)
+[![Rust / Go / C++](https://img.shields.io/badge/Rust%20%7C%20Go%20%7C%20C%2B%2B-native-orange.svg)](#)
+[![Flutter / Mobile](https://img.shields.io/badge/Flutter%20%7C%20iOS%20%7C%20Android-polyglot-blue.svg)](#)
 
 </div>
 
@@ -72,11 +75,14 @@ Claude Code 通过 stdin 以 JSON 传入事件（`tool_name`、`tool_input`、`c
 
 ## ✨ 特性
 
-* 🛡️ **零信任配置盾**：锁定 `tsconfig.json`、`package.json`、`.eslintrc`、`governor.config.*` 以及 `.claude/`。
-* ⚡ **AST 显微手术**：用 `@babel/parser` 在 Write/Edit 之后扫描 `.ts` / `.tsx` / `.js` / `.jsx`，在 Agent 继续之前抓住非法模式。
+* 🛡️ **零信任配置盾**：锁定 `tsconfig.json`、`package.json`、`pyproject.toml`、`Cargo.toml`、`go.mod`、`pubspec.yaml`、Gradle/Podfile、`governor.config.json` 以及 `.claude/`。
+* ⚡ **多语言 AST / 语法门禁**：
+  * **Node.js / TS** — `@babel/parser`
+  * **Python** — 仅标准库 `ast`（零 pip 依赖，拦截 `eval`/`exec`/废弃导入）
+  * **Rust / Go / C++ / Flutter** — 小于 15ms 的 Shell 规则（禁止 `unsafe` / 裸 `panic()`）
 * 🚨 **确定性拦截**：用进程退出码 `2` 把阻断原因写回 Agent 上下文。
-* 🚀 **启动快**：esbuild 打成单文件，目标是 Hook 启动 < 50ms。
-* 🧩 **项目级策略**：用 `governor.config.cjs` 追加保护文件、正则防线和 AST 规则。
+* 🚀 **启动快**：打包后的 JS 引擎、零依赖 Python、以及轻量 Bash Native 门禁。
+* 🧩 **共享策略文件**：所有运行时读取同一份 `governor.config.json`。
 
 ---
 
@@ -84,10 +90,15 @@ Claude Code 通过 stdin 以 JSON 传入事件（`tool_name`、`tool_input`、`c
 
 ```bash
 npm install -D agent-governor
-npx agent-governor init
+npx agent-governor init              # 自动识别 Node / Python / Rust / Go / Flutter
+npx agent-governor init --lang python
+npx agent-governor init --lang native
+npx agent-governor init --lang all
 ```
 
-`init` 会向 `.claude/settings.json` 注入：
+`init` 会写入共享的 `governor.config.json`，把零依赖运行时复制到 `.agent-governor/`，并注入对应 Hook。
+
+### Node.js / TypeScript
 
 ```json
 {
@@ -95,82 +106,93 @@ npx agent-governor init
     "PreToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "npx agent-governor pre-check"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "npx agent-governor post-check"
-          }
-        ]
+        "hooks": [{ "type": "command", "command": "npx agent-governor pre-check" }]
       }
     ]
   }
 }
 ```
 
-追求极致启动速度时，可直接指向打包文件：
+### Python（仅标准库 `ast`，无需 pip 包）
 
-```bash
-node ./node_modules/agent-governor/dist/pre-tool-use.js
-node ./node_modules/agent-governor/dist/post-tool-use.js
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [{ "type": "command", "command": "python3 .agent-governor/python/pre_tool_use.py" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "python3 .agent-governor/python/post_tool_use.py" }]
+      }
+    ]
+  }
+}
+```
+
+### Native / 多语言（Rust、Go、C/C++、Flutter、iOS、Android）
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [{ "type": "command", "command": "bash .agent-governor/native/governor_guard.sh" }]
+      }
+    ]
+  }
+}
 ```
 
 ---
 
 ## ⚙️ 配置
 
-仓库根目录放置 `governor.config.cjs`（也支持 `.js` / `.mjs` / `.json`）：
+所有运行时共享仓库根目录的 `governor.config.json`：
 
-```js
-module.exports = {
-  protectedFiles: [
-    'tsconfig.json',
-    'biome.json',
-    'package.json',
-    'pnpm-lock.yaml',
+```json
+{
+  "protectedFiles": [
+    "tsconfig.json",
+    "package.json",
+    "pyproject.toml",
+    "Cargo.toml",
+    "go.mod",
+    "pubspec.yaml"
   ],
-  forbiddenBashPatterns: [
-    /git commit.*--no-verify/i,
-    /npm set strict-ssl false/i,
-    /rm -rf \.git/i,
-  ],
-  astRules: {
-    noDirectEval: true,
-    noNewFunction: true,
-    requireErrorBoundary: true,
-  },
-};
+  "protectedDirectories": [".claude/", ".agent-governor/"],
+  "forbiddenBashPatterns": [
+    "git commit.*--no-verify",
+    "pip install --insecure",
+    "cargo publish --no-verify"
+  ]
+}
 ```
 
-用户配置与内置默认规则 **合并**（数组拼接，AST 开关覆盖）。可复制 [`governor.config.example.cjs`](./governor.config.example.cjs)。
+可复制 [`governor.config.example.json`](./governor.config.example.json)。
 
 ---
 
 ## 📊 性能
 
-| 检查类型 | 耗时 | 内存 |
+| 检查类型 | 运行时 | 耗时 |
 | --- | --- | --- |
-| 配置盾（PreToolUse） | < 8ms | ~12 MB |
-| AST 扫描（PostToolUse） | < 28ms（约 1000 LOC） | ~24 MB |
-
-`npm run build` 会生成内联 parser 的 `dist/*.js` 单文件。
+| 配置盾（PreToolUse） | Node / Python / Bash | < 8–15ms |
+| JS/TS AST | `@babel/parser` | < 28ms（约 1000 LOC） |
+| Python AST | 标准库 `ast` | < 10ms |
+| Rust `unsafe` / Go `panic` | Bash + 正则 | < 15ms |
 
 ---
 
 ## 🧪 CLI
 
 ```bash
-npx agent-governor init
+npx agent-governor init --lang auto
 npx agent-governor pre-check
 npx agent-governor post-check
 npx agent-governor version

@@ -23,6 +23,25 @@ export const CONFIG = {
     'pnpm-lock.yaml',
     'yarn.lock',
     'package-lock.json',
+    'pyproject.toml',
+    'requirements.txt',
+    'setup.py',
+    'setup.cfg',
+    'Pipfile',
+    'Pipfile.lock',
+    'Cargo.toml',
+    'Cargo.lock',
+    'go.mod',
+    'go.sum',
+    'CMakeLists.txt',
+    'Makefile',
+    'pubspec.yaml',
+    'pubspec.lock',
+    'Podfile',
+    'Podfile.lock',
+    'Package.swift',
+    'build.gradle',
+    'build.gradle.kts',
     'governor.config.js',
     'governor.config.cjs',
     'governor.config.mjs',
@@ -38,7 +57,9 @@ export const CONFIG = {
     /git\s+push[\s\S]*--no-verify/i,
     /rm\s+-rf\s+\.git\b/i,
     /npm\s+set\s+strict-ssl\s+false/i,
-    /git\s+push[\s\S]*--force(?:-with-lease)?\s+(?:origin\s+)?(?:main|master)\b/i,
+    /pip(?:3)?\s+install[\s\S]*--insecure/i,
+    /cargo\s+publish[\s\S]*--no-verify/i,
+    /git\s+push[\s\S]*--force(?:-with-lease)?/i,
     /git\s+push[\s\S]*\s-f\s+(?:origin\s+)?(?:main|master)\b/i,
   ],
 
@@ -46,6 +67,10 @@ export const CONFIG = {
     noDirectEval: true,
     noNewFunction: true,
     requireErrorBoundary: false,
+    pythonForbiddenCalls: ['eval', 'exec'],
+    pythonDeprecatedImports: ['imp', 'optparse'],
+    rustForbidUnsafe: true,
+    goForbidPanic: true,
   },
 };
 
@@ -130,12 +155,23 @@ async function importConfigModule(filePath) {
   throw last;
 }
 
+export function toJsonConfig(config = CONFIG) {
+  return {
+    protectedFiles: config.protectedFiles,
+    protectedDirectories: config.protectedDirectories,
+    forbiddenBashPatterns: (config.forbiddenBashPatterns || []).map((pattern) =>
+      pattern instanceof RegExp ? pattern.source : String(pattern)
+    ),
+    astRules: config.astRules,
+  };
+}
+
 export async function loadConfig(cwd = process.cwd()) {
   const candidates = [
+    path.join(cwd, 'governor.config.json'),
     path.join(cwd, 'governor.config.cjs'),
     path.join(cwd, 'governor.config.js'),
     path.join(cwd, 'governor.config.mjs'),
-    path.join(cwd, 'governor.config.json'),
   ];
 
   for (const filePath of candidates) {

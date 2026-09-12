@@ -1,7 +1,12 @@
-export { CONFIG, loadConfig, mergeConfig } from './config.js';
+export { CONFIG, loadConfig, mergeConfig, toJsonConfig } from './config.js';
 export { evaluatePreToolUse, runPreToolUseGuard } from './pre-tool-use.js';
 export { evaluatePostToolUse, inspectAST, runPostToolUseGuard } from './post-tool-use.js';
-export { initProject, mergeHookSettings } from './init.js';
+export {
+  detectLanguages,
+  initProject,
+  mergeHookSettings,
+  parseLangFlag,
+} from './init.js';
 
 /**
  * @typedef {Object} GovernorAstRules

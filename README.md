@@ -12,6 +12,9 @@
 [![Claude Code Support](https://img.shields.io/badge/Claude%20Code-v1.0%2B-brightgreen.svg)](#)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/lihenair/agent-governor/pulls)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-green.svg)](#)
+[![Python](https://img.shields.io/badge/Python-3.9%2B%20zero--dep-3776AB.svg)](#)
+[![Rust / Go / C++](https://img.shields.io/badge/Rust%20%7C%20Go%20%7C%20C%2B%2B-native-orange.svg)](#)
+[![Flutter / Mobile](https://img.shields.io/badge/Flutter%20%7C%20iOS%20%7C%20Android-polyglot-blue.svg)](#)
 
 </div>
 
@@ -72,11 +75,14 @@ Claude Code sends each event as JSON on stdin (`tool_name`, `tool_input`, `cwd`,
 
 ## ✨ Key Features
 
-* 🛡️ **Zero-Trust Config Shield**: Locks `tsconfig.json`, `package.json`, `.eslintrc`, `governor.config.*`, and `.claude/` from agent edits.
-* ⚡ **AST-Based Micro-Surgery**: Inspects modified source (`.ts`, `.tsx`, `.js`, `.jsx`) post-execution via `@babel/parser` to catch illegal patterns before the agent continues.
+* 🛡️ **Zero-Trust Config Shield**: Locks `tsconfig.json`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pubspec.yaml`, Gradle/Podfile, `governor.config.json`, and `.claude/` from agent edits.
+* ⚡ **Polyglot AST / syntax gates**:
+  * **Node.js / TS** — `@babel/parser` (`eval`, `new Function`, custom visitors)
+  * **Python** — stdlib `ast` only (zero pip deps, `eval`/`exec`/deprecated imports)
+  * **Rust / Go / C++ / Flutter** — sub-15ms shell + regex/`cargo`/`panic` SOP checks
 * 🚨 **Deterministic Interception**: Uses native process exit signals (`Exit 2`) to feed exact block reasons back into the agent's context loop.
-* 🚀 **Blazing Fast**: Bundled single-file engine (esbuild) designed for sub-50ms hook startup.
-* 🧩 **Project-local policy**: Extend rules with `governor.config.cjs` — extra protected files, regex fences, and AST visitors.
+* 🚀 **Blazing Fast**: Bundled JS engine, zero-dep Python, and a tiny Bash native guard.
+* 🧩 **Shared policy file**: All runtimes read the same `governor.config.json`.
 
 ---
 
@@ -95,10 +101,15 @@ pnpm add -D agent-governor
 Run the setup wizard to automatically configure `.claude/settings.json`:
 
 ```bash
-npx agent-governor init
+npx agent-governor init              # auto-detect Node / Python / Rust / Go / Flutter
+npx agent-governor init --lang python
+npx agent-governor init --lang native
+npx agent-governor init --lang all
 ```
 
-This injects the required Hook bindings:
+`init` writes a shared `governor.config.json`, copies zero-dep runtimes into `.agent-governor/`, and injects the matching Claude Code hooks.
+
+### Node.js / TypeScript
 
 ```json
 {
@@ -106,21 +117,42 @@ This injects the required Hook bindings:
     "PreToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [{ "type": "command", "command": "npx agent-governor pre-check" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [{ "type": "command", "command": "npx agent-governor post-check" }]
+      }
+    ]
+  }
+}
+```
+
+### Python (stdlib `ast`, no pip packages)
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "npx agent-governor pre-check"
+            "command": "python3 .agent-governor/python/pre_tool_use.py"
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "npx agent-governor post-check"
+            "command": "python3 .agent-governor/python/post_tool_use.py"
           }
         ]
       }
@@ -129,7 +161,27 @@ This injects the required Hook bindings:
 }
 ```
 
-You can also point hooks at the bundled files for slightly faster startup:
+### Native / Polyglot (Rust, Go, C/C++, Flutter, iOS, Android)
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .agent-governor/native/governor_guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+You can also point Node hooks at the bundled files for slightly faster startup:
 
 ```bash
 node ./node_modules/agent-governor/dist/pre-tool-use.js
@@ -138,41 +190,44 @@ node ./node_modules/agent-governor/dist/post-tool-use.js
 
 ---
 
-## ⚙️ Configuration (`governor.config.cjs`)
+## ⚙️ Configuration (`governor.config.json`)
 
-Create a `governor.config.cjs` (or `.js` / `.mjs` / `.json`) file in your repository root to customize governance rules:
+One JSON file is shared by the Node, Python, and native runtimes:
 
-```js
-module.exports = {
-  // Config files that Agents are NEVER allowed to edit
-  protectedFiles: [
-    'tsconfig.json',
-    'biome.json',
-    'package.json',
-    'pnpm-lock.yaml',
+```json
+{
+  "protectedFiles": [
+    "tsconfig.json",
+    "package.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "Cargo.toml",
+    "Cargo.lock",
+    "go.mod",
+    "go.sum",
+    "CMakeLists.txt",
+    "pubspec.yaml",
+    ".eslintrc",
+    "biome.json"
   ],
-
-  // Dangerous bash commands to block
-  forbiddenBashPatterns: [
-    /git commit.*--no-verify/i,
-    /npm set strict-ssl false/i,
-    /rm -rf \.git/i,
+  "protectedDirectories": [".claude/", ".agent-governor/"],
+  "forbiddenBashPatterns": [
+    "git commit.*--no-verify",
+    "rm -rf \\.git",
+    "pip install --insecure",
+    "cargo publish --no-verify"
   ],
-
-  // Custom AST checks
-  astRules: {
-    noDirectEval: true,
-    noNewFunction: true,
-    requireErrorBoundary: true,
-    forbiddenCallNames: [],
-    forbiddenIdentifiers: [],
-  },
-};
+  "astRules": {
+    "noDirectEval": true,
+    "pythonForbiddenCalls": ["eval", "exec"],
+    "pythonDeprecatedImports": ["imp", "optparse"],
+    "rustForbidUnsafe": true,
+    "goForbidPanic": true
+  }
+}
 ```
 
-User config is **merged** with built-in defaults (arrays are concatenated, AST flags are overridden).
-
-Copy [`governor.config.example.cjs`](./governor.config.example.cjs) to get started.
+Copy [`governor.config.example.json`](./governor.config.example.json) to get started. `governor.config.cjs` is still accepted as a Node-only overlay.
 
 ---
 
@@ -180,10 +235,12 @@ Copy [`governor.config.example.cjs`](./governor.config.example.cjs) to get start
 
 `agent-governor` is built with execution speed as a top priority so it does not slow down your AI workflow:
 
-| Check Type | Execution Time | Memory Overhead |
+| Check Type | Runtime | Execution Time |
 | --- | --- | --- |
-| Config Shield (PreToolUse) | < 8ms | ~12 MB |
-| AST Rule Scan (PostToolUse) | < 28ms (for 1000 LOC) | ~24 MB |
+| Config Shield (PreToolUse) | Node / Python / Bash | < 8–15ms |
+| JS/TS AST (PostToolUse) | `@babel/parser` | < 28ms (1000 LOC) |
+| Python AST (PostToolUse) | stdlib `ast` | < 10ms |
+| Rust `unsafe` / Go `panic` scan | Bash + regex | < 15ms |
 
 Run `npm run build` to emit zero-walk `dist/*.js` bundles (parser + traverse inlined).
 
@@ -192,9 +249,9 @@ Run `npm run build` to emit zero-walk `dist/*.js` bundles (parser + traverse inl
 ## 🧪 CLI
 
 ```bash
-npx agent-governor init         # wire Claude Code hooks
-npx agent-governor pre-check    # stdin JSON → allow / block
-npx agent-governor post-check   # stdin JSON → AST scan
+npx agent-governor init --lang auto
+npx agent-governor pre-check
+npx agent-governor post-check
 npx agent-governor version
 ```
 

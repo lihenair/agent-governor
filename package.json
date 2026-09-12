@@ -18,6 +18,9 @@
     "bin",
     "src",
     "dist",
+    "python",
+    "native",
+    "governor.config.example.json",
     "README.md",
     "README_ZH.md",
     "LICENSE"
@@ -38,7 +41,10 @@
     "security",
     "ast",
     "policy",
-    "pretooluse"
+    "python",
+    "rust",
+    "golang",
+    "polyglot"
   ],
   "repository": {
     "type": "git",
