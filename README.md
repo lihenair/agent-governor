@@ -75,14 +75,33 @@ Claude Code sends each event as JSON on stdin (`tool_name`, `tool_input`, `cwd`,
 
 ## ✨ Key Features
 
-* 🛡️ **Zero-Trust Config Shield**: Locks `tsconfig.json`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pubspec.yaml`, Gradle/Podfile, `governor.config.json`, and `.claude/` from agent edits.
-* ⚡ **Polyglot AST / syntax gates**:
-  * **Node.js / TS** — `@babel/parser` (`eval`, `new Function`, custom visitors)
-  * **Python** — stdlib `ast` only (zero pip deps, `eval`/`exec`/deprecated imports)
-  * **Rust / Go / C++ / Flutter** — sub-15ms shell + regex/`cargo`/`panic` SOP checks
-* 🚨 **Deterministic Interception**: Uses native process exit signals (`Exit 2`) to feed exact block reasons back into the agent's context loop.
-* 🚀 **Blazing Fast**: Bundled JS engine, zero-dep Python, and a tiny Bash native guard.
-* 🧩 **Shared policy file**: All runtimes read the same `governor.config.json`.
+* 🛡️ **Zero-Trust Config Shield**: Locks toolchain manifests across JS, Python, Rust, Go, Flutter, iOS, and Android.
+* ⚡ **Single dispatcher**: one PreToolUse + one PostToolUse hook. File extension picks the inspector (no triple-hook lag).
+* 🧠 **Polyglot source policy** driven by `governor.config.json` `astRules` (flags are real, not docs-only).
+* 🪟 **Windows-safe default**: the dispatcher is Node. Bash/Python runtimes stay optional.
+* 📎 **Cursor soft adapter**: `init` writes `.cursor/rules/agent-governor.mdc` because Cursor has no PreToolUse hooks.
+
+### Language coverage
+
+| Language | Config shield | Source policy (dispatcher) | Engine |
+| --- | --- | --- | --- |
+| JavaScript / TypeScript | `package.json`, `tsconfig.json`, lockfiles, eslint/biome | `eval`, `new Function()`, custom forbidden calls | Babel AST |
+| Python | `pyproject.toml`, `requirements.txt`, `setup.py`, Pipfile | `eval`/`exec`, `imp`/`optparse` | Fast path in Node; stdlib `ast` if `--lang python` |
+| Rust | `Cargo.toml`, `Cargo.lock` | `unsafe {` (`rustForbidUnsafe`, default on) | Regex SOP |
+| Go | `go.mod`, `go.sum` | `panic(` (`goForbidPanic`, **default off**) | Regex SOP |
+| Dart / Flutter | `pubspec.yaml` | `dart:mirrors` | Regex SOP |
+| Swift / iOS | `Podfile`, `Package.swift` | `try!`, `as!` | Regex SOP |
+| Kotlin / Android | `build.gradle(.kts)`, `settings.gradle`, `AndroidManifest.xml` | `!!`, `TODO()` | Regex SOP |
+| Java | Gradle / manifest | `Runtime.getRuntime().exec()` | Regex SOP |
+| C / C++ | `CMakeLists.txt`, `Makefile` | `gets()`, `system()` | Regex SOP |
+
+### IDE / agent support
+
+| Tool | Enforcement | What `init` does |
+| --- | --- | --- |
+| **Claude Code** | Hard. `PreToolUse` / `PostToolUse`, exit 2 | Writes `.claude/settings.json` dispatcher hooks |
+| **Cursor** | Soft. No tool hooks | Writes `.cursor/rules/agent-governor.mdc` |
+| **OpenCode** | None built-in | Use Claude Code, or pipe tool JSON through `npx agent-governor hook` in your own wrapper |
 
 ---
 
@@ -101,15 +120,11 @@ pnpm add -D agent-governor
 Run the setup wizard to automatically configure `.claude/settings.json`:
 
 ```bash
-npx agent-governor init              # auto-detect Node / Python / Rust / Go / Flutter
-npx agent-governor init --lang python
-npx agent-governor init --lang native
-npx agent-governor init --lang all
+npx agent-governor init              # one dispatcher hook, all languages
+npx agent-governor init --lang python  # optional: stdlib ast only, no Babel
 ```
 
-`init` writes a shared `governor.config.json`, copies zero-dep runtimes into `.agent-governor/`, and injects the matching Claude Code hooks.
-
-### Node.js / TypeScript
+Default hooks (covers JS/TS, Python, Rust, Go, Dart, Swift, Kotlin, Java, C/C++):
 
 ```json
 {
@@ -130,63 +145,13 @@ npx agent-governor init --lang all
 }
 ```
 
-### Python (stdlib `ast`, no pip packages)
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .agent-governor/python/pre_tool_use.py"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .agent-governor/python/post_tool_use.py"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### Native / Polyglot (Rust, Go, C/C++, Flutter, iOS, Android)
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .agent-governor/native/governor_guard.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-You can also point Node hooks at the bundled files for slightly faster startup:
+Or a single command that reads `hook_event_name`:
 
 ```bash
-node ./node_modules/agent-governor/dist/pre-tool-use.js
-node ./node_modules/agent-governor/dist/post-tool-use.js
+npx agent-governor hook
 ```
+
+`--lang python` still installs zero-dep `python3 .agent-governor/python/*.py` hooks. The Bash native guard remains in the package for air-gapped Unix boxes, but the default path is Node so Windows works without `bash`/`python3`.
 
 ---
 
@@ -222,7 +187,12 @@ One JSON file is shared by the Node, Python, and native runtimes:
     "pythonForbiddenCalls": ["eval", "exec"],
     "pythonDeprecatedImports": ["imp", "optparse"],
     "rustForbidUnsafe": true,
-    "goForbidPanic": true
+    "goForbidPanic": false,
+    "dartForbidMirrors": true,
+    "swiftForbidForceTry": true,
+    "kotlinForbidBangBang": true,
+    "cppForbidUnsafeC": true,
+    "javaForbidRuntimeExec": true
   }
 }
 ```
@@ -237,10 +207,10 @@ Copy [`governor.config.example.json`](./governor.config.example.json) to get sta
 
 | Check Type | Runtime | Execution Time |
 | --- | --- | --- |
-| Config Shield (PreToolUse) | Node / Python / Bash | < 8–15ms |
-| JS/TS AST (PostToolUse) | `@babel/parser` | < 28ms (1000 LOC) |
-| Python AST (PostToolUse) | stdlib `ast` | < 10ms |
-| Rust `unsafe` / Go `panic` scan | Bash + regex | < 15ms |
+| Config shield | Node dispatcher | < 8ms |
+| JS/TS AST | Babel | < 28ms (1000 LOC) |
+| Python / Rust / Go / Dart / Swift / Kotlin / Java / C | Node regex SOP | < 5ms |
+| Optional Python stdlib `ast` | `python3` | < 10ms |
 
 Run `npm run build` to emit zero-walk `dist/*.js` bundles (parser + traverse inlined).
 
@@ -249,7 +219,8 @@ Run `npm run build` to emit zero-walk `dist/*.js` bundles (parser + traverse inl
 ## 🧪 CLI
 
 ```bash
-npx agent-governor init --lang auto
+npx agent-governor init
+npx agent-governor hook
 npx agent-governor pre-check
 npx agent-governor post-check
 npx agent-governor version

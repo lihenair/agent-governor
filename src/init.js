@@ -22,24 +22,20 @@ function commandHook(matcher, command) {
 }
 
 export function hookSettingsFor(langs = ['node']) {
-  const selected = new Set(langs.includes('all') ? ['node', 'python', 'native'] : langs);
-  const PreToolUse = [];
-  const PostToolUse = [];
+  const selected = new Set(langs.includes('all') ? ['node'] : langs);
+  const pythonOnly = selected.size === 1 && selected.has('python');
 
-  if (selected.has('node')) {
-    PreToolUse.push(commandHook(PRE_MATCHER, DEFAULT_HOOK_COMMANDS.nodePre));
-    PostToolUse.push(commandHook(WRITE_MATCHER, DEFAULT_HOOK_COMMANDS.nodePost));
-  }
-  if (selected.has('python')) {
-    PreToolUse.push(commandHook(PRE_MATCHER, DEFAULT_HOOK_COMMANDS.pythonPre));
-    PostToolUse.push(commandHook(WRITE_MATCHER, DEFAULT_HOOK_COMMANDS.pythonPost));
-  }
-  if (selected.has('native')) {
-    PreToolUse.push(commandHook(PRE_MATCHER, DEFAULT_HOOK_COMMANDS.native));
-    PostToolUse.push(commandHook(WRITE_MATCHER, DEFAULT_HOOK_COMMANDS.native));
+  if (pythonOnly) {
+    return {
+      PreToolUse: [commandHook(PRE_MATCHER, DEFAULT_HOOK_COMMANDS.pythonPre)],
+      PostToolUse: [commandHook(WRITE_MATCHER, DEFAULT_HOOK_COMMANDS.pythonPost)],
+    };
   }
 
-  return { PreToolUse, PostToolUse };
+  return {
+    PreToolUse: [commandHook(PRE_MATCHER, DEFAULT_HOOK_COMMANDS.nodePre)],
+    PostToolUse: [commandHook(WRITE_MATCHER, DEFAULT_HOOK_COMMANDS.nodePost)],
+  };
 }
 
 /** @deprecated use hookSettingsFor */
@@ -245,6 +241,17 @@ export function initProject(
       existsSync,
     });
     created.push(...copied.map((file) => path.relative(cwd, file)));
+  }
+
+  const cursorRuleSource = path.join(packageRoot, 'adapters', 'cursor-rule.mdc');
+  if (existsSync(cursorRuleSource)) {
+    const cursorDir = path.join(cwd, '.cursor', 'rules');
+    mkdirSync(cursorDir, { recursive: true });
+    const cursorRulePath = path.join(cursorDir, 'agent-governor.mdc');
+    if (!existsSync(cursorRulePath)) {
+      copyFileSync(cursorRuleSource, cursorRulePath);
+      created.push(path.relative(cwd, cursorRulePath));
+    }
   }
 
   return { settingsPath, configPath, created, langs };

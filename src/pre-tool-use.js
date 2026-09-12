@@ -10,6 +10,7 @@ import {
   loadConfig,
   resolveProjectRoot,
 } from './config.js';
+import { extractWriteSnippets, formatInspectBlock, inspectSource } from './inspect.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
 function blockMessage(body) {
@@ -45,6 +46,19 @@ export function evaluatePreToolUse(payload, config = CONFIG, projectRoot = proce
           stderr: blockMessage(
             `Access denied to path "${targetFilePath}". Modification of agent governance infrastructure is forbidden.`
           ),
+        };
+      }
+    }
+
+    const snippets = extractWriteSnippets(toolInput);
+    for (const { filePath, code } of snippets) {
+      const inspectErrors = inspectSource(filePath, code, config);
+      if (inspectErrors.length > 0) {
+        return {
+          exitCode: 2,
+          stderr:
+            `[Agent Governor AST Check Failed] ❌ ${formatInspectBlock(filePath, inspectErrors)}\n\n` +
+            `Fix the source before the tool runs. Do not weaken compiler or linter config.`,
         };
       }
     }

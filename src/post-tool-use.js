@@ -2,116 +2,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import * as parser from '@babel/parser';
-import traverse from '@babel/traverse';
 import { CONFIG, extractFilePaths, isWriteTool, loadConfig, resolveProjectRoot } from './config.js';
+import { formatInspectBlock, inspectAST, inspectSource } from './inspect.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
-const defaultTraverse = traverse.default || traverse;
-
-const PARSER_PLUGINS = [
-  'typescript',
-  'jsx',
-  'classProperties',
-  'classPrivateProperties',
-  'classPrivateMethods',
-  'decorators-legacy',
-  'importAssertions',
-  'topLevelAwait',
-];
-
-function hasJsx(ast) {
-  let found = false;
-  defaultTraverse(ast, {
-    JSXElement() {
-      found = true;
-    },
-    JSXFragment() {
-      found = true;
-    },
-  });
-  return found;
-}
-
-export function inspectAST(filePath, code, config = CONFIG) {
-  const errors = [];
-  const ext = path.extname(filePath);
-
-  if (!config.codeExtensions.includes(ext)) {
-    return errors;
-  }
-
-  let ast;
-  try {
-    ast = parser.parse(code, {
-      sourceType: 'unambiguous',
-      allowReturnOutsideFunction: true,
-      plugins: PARSER_PLUGINS,
-    });
-  } catch (parseError) {
-    errors.push(`Syntax Error in generated code: ${parseError.message}`);
-    return errors;
-  }
-
-  const astRules = config.astRules || {};
-
-  defaultTraverse(ast, {
-    CallExpression(pathNode) {
-      const callee = pathNode.node.callee;
-      const line = pathNode.node.loc?.start.line ?? '?';
-
-      if (
-        astRules.noDirectEval !== false &&
-        callee.type === 'Identifier' &&
-        callee.name === 'eval'
-      ) {
-        errors.push(`Line ${line}: Direct 'eval()' usage is strictly forbidden.`);
-      }
-
-      if (Array.isArray(astRules.forbiddenCallNames)) {
-        if (callee.type === 'Identifier' && astRules.forbiddenCallNames.includes(callee.name)) {
-          errors.push(`Line ${line}: Call to forbidden function '${callee.name}()' is not allowed.`);
-        }
-      }
-    },
-
-    NewExpression(pathNode) {
-      const callee = pathNode.node.callee;
-      const line = pathNode.node.loc?.start.line ?? '?';
-      if (
-        astRules.noNewFunction &&
-        callee.type === 'Identifier' &&
-        callee.name === 'Function'
-      ) {
-        errors.push(`Line ${line}: 'new Function()' is a dynamic eval equivalent and is forbidden.`);
-      }
-    },
-
-    Identifier(pathNode) {
-      const names = astRules.forbiddenIdentifiers;
-      if (!Array.isArray(names) || names.length === 0) {
-        return;
-      }
-      if (names.includes(pathNode.node.name) && pathNode.isReferencedIdentifier()) {
-        const line = pathNode.node.loc?.start.line ?? '?';
-        errors.push(`Line ${line}: Identifier '${pathNode.node.name}' is forbidden by project policy.`);
-      }
-    },
-  });
-
-  if (astRules.requireErrorBoundary && ['.jsx', '.tsx'].includes(ext) && hasJsx(ast)) {
-    const looksLikeAppShell = /(^|\/)(App|Root|main|index)\.(jsx|tsx)$/i.test(
-      filePath.split(path.sep).join('/')
-    );
-    if (looksLikeAppShell && !/\bErrorBoundary\b/.test(code)) {
-      errors.push(
-        `React app shell "${path.basename(filePath)}" must include an ErrorBoundary to satisfy architecture SOP.`
-      );
-    }
-  }
-
-  return errors;
-}
+export { inspectAST };
 
 export function evaluatePostToolUse(
   payload,
@@ -135,12 +30,9 @@ export function evaluatePostToolUse(
       continue;
     }
     const code = readFileSync(filePath, 'utf8');
-    const astErrors = inspectAST(filePath, code, config);
+    const astErrors = inspectSource(filePath, code, config);
     if (astErrors.length > 0) {
-      allErrors.push(
-        `Post-execution AST Validation Errors in "${filePath}":\n` +
-          astErrors.map((entry) => ` - ${entry}`).join('\n')
-      );
+      allErrors.push(formatInspectBlock(filePath, astErrors));
     }
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "agent-governor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Deterministic Runtime Guardrails for Claude Code & AI Coding Agents",
   "license": "MIT",
   "type": "module",
@@ -20,6 +20,8 @@
     "dist",
     "python",
     "native",
+    "adapters",
+    ".claude-plugin",
     "governor.config.example.json",
     "README.md",
     "README_ZH.md",

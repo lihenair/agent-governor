@@ -41,7 +41,9 @@ export const CONFIG = {
     'Podfile.lock',
     'Package.swift',
     'build.gradle',
-    'build.gradle.kts',
+    'settings.gradle',
+    'settings.gradle.kts',
+    'AndroidManifest.xml',
     'governor.config.js',
     'governor.config.cjs',
     'governor.config.mjs',
@@ -50,7 +52,27 @@ export const CONFIG = {
 
   protectedDirectories: ['.claude/', '.agent-governor/'],
 
-  codeExtensions: ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx'],
+  codeExtensions: [
+    '.js',
+    '.jsx',
+    '.mjs',
+    '.cjs',
+    '.ts',
+    '.tsx',
+    '.py',
+    '.rs',
+    '.go',
+    '.dart',
+    '.swift',
+    '.kt',
+    '.kts',
+    '.java',
+    '.c',
+    '.h',
+    '.cc',
+    '.cpp',
+    '.hpp',
+  ],
 
   forbiddenBashPatterns: [
     /git\s+commit[\s\S]*--no-verify/i,
@@ -70,7 +92,12 @@ export const CONFIG = {
     pythonForbiddenCalls: ['eval', 'exec'],
     pythonDeprecatedImports: ['imp', 'optparse'],
     rustForbidUnsafe: true,
-    goForbidPanic: true,
+    goForbidPanic: false,
+    dartForbidMirrors: true,
+    swiftForbidForceTry: true,
+    kotlinForbidBangBang: true,
+    cppForbidUnsafeC: true,
+    javaForbidRuntimeExec: true,
   },
 };
 

@@ -1,0 +1,21 @@
+---
+description: Soft Agent Governor policy for Cursor (Cursor has no PreToolUse hooks)
+alwaysApply: true
+---
+
+# Agent Governor (Cursor)
+
+Cursor does not expose Claude Code-style `PreToolUse` hooks. Follow these rules anyway:
+
+- Do not edit protected manifests to "fix" compile/lint errors: `tsconfig.json`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pubspec.yaml`, Gradle/Podfile, `governor.config.json`.
+- Do not bypass git hooks (`--no-verify`), force-push, or run `pip install --insecure` / `cargo publish --no-verify`.
+- Do not introduce `eval` / `exec` / `new Function()`.
+- Rust: do not add `unsafe {` unless the user explicitly asked.
+- Go: prefer `error` returns over `panic()`.
+- Dart: do not import `dart:mirrors`.
+- Swift: do not use `try!` or `as!`.
+- Kotlin: do not use `!!` or leave `TODO()`.
+- C/C++: do not call `gets()` or `system()`.
+- Java: do not call `Runtime.getRuntime().exec()`.
+
+Fix source code instead of weakening the toolchain.

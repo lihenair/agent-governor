@@ -35,6 +35,11 @@
     "pythonForbiddenCalls": ["eval", "exec"],
     "pythonDeprecatedImports": ["imp", "optparse"],
     "rustForbidUnsafe": true,
-    "goForbidPanic": true
+    "goForbidPanic": false,
+    "dartForbidMirrors": true,
+    "swiftForbidForceTry": true,
+    "kotlinForbidBangBang": true,
+    "cppForbidUnsafeC": true,
+    "javaForbidRuntimeExec": true
   }
 }

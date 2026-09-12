@@ -109,18 +109,59 @@ if [ "${TOOL_NAME}" = "Edit" ] || [ "${TOOL_NAME}" = "Write" ] || [ "${TOOL_NAME
     BODY="$(cat -- "${FILE_PATH}")"
   fi
 
-  case "${FILE_PATH}" in
-    *.rs)
-      if printf '%s\n' "${BODY}" | grep -q 'unsafe[[:space:]]*{'; then
-        block "[Agent Governor Rules] ❌ GOVERNOR BLOCK: Injection of 'unsafe' blocks in Rust source code is strictly forbidden."
-      fi
-      ;;
-    *.go)
-      if printf '%s\n' "${BODY}" | grep -q 'panic('; then
-        block "[Agent Governor Rules] ❌ GOVERNOR BLOCK: Unhandled 'panic()' found. Use proper error returning instead."
-      fi
-      ;;
-  esac
+  VIOLATION=""
+  if [ -n "${BODY}" ]; then
+    BODY_FILE="$(mktemp)"
+    printf '%s' "${BODY}" > "${BODY_FILE}"
+    VIOLATION="$(FILE_PATH="${FILE_PATH}" BODY_FILE="${BODY_FILE}" CONFIG_FILE="${CONFIG_FILE}" python3 - <<'PY' || true
+import json, os, re, sys
+
+path = os.environ.get("FILE_PATH") or ""
+body_file = os.environ.get("BODY_FILE") or ""
+body = open(body_file, encoding="utf-8").read() if body_file and os.path.exists(body_file) else ""
+rules = {
+    "rustForbidUnsafe": True,
+    "goForbidPanic": False,
+    "dartForbidMirrors": True,
+    "swiftForbidForceTry": True,
+    "kotlinForbidBangBang": True,
+    "cppForbidUnsafeC": True,
+    "javaForbidRuntimeExec": True,
+}
+config_file = os.environ.get("CONFIG_FILE") or ""
+if config_file and os.path.exists(config_file):
+    try:
+        loaded = json.load(open(config_file, encoding="utf-8"))
+        rules.update(loaded.get("astRules") or {})
+    except Exception:
+        pass
+
+def hit(pattern, message):
+    if re.search(pattern, body):
+        print(message)
+        raise SystemExit(0)
+
+if path.endswith(".rs") and rules.get("rustForbidUnsafe", True):
+    hit(r"unsafe\s*\{", "unsafe")
+if path.endswith(".go") and rules.get("goForbidPanic") is True:
+    hit(r"panic\s*\(", "panic")
+if path.endswith(".dart") and rules.get("dartForbidMirrors", True):
+    hit(r"dart:mirrors", "mirrors")
+if path.endswith(".swift") and rules.get("swiftForbidForceTry", True):
+    hit(r"try!|as!", "swift-force")
+if path.endswith((".kt", ".kts")) and rules.get("kotlinForbidBangBang", True):
+    hit(r"!!|TODO\s*\(", "kotlin")
+if path.endswith((".c", ".h", ".cc", ".cpp", ".cxx", ".hpp")) and rules.get("cppForbidUnsafeC", True):
+    hit(r"\b(gets|system)\s*\(", "c-unsafe")
+if path.endswith(".java") and rules.get("javaForbidRuntimeExec", True):
+    hit(r"Runtime\.getRuntime\(\)\s*\.exec\s*\(", "java-exec")
+PY
+)"
+    rm -f "${BODY_FILE}"
+  fi
+  if [ -n "${VIOLATION}" ]; then
+    block "[Agent Governor Rules] ❌ GOVERNOR BLOCK: Source policy '${VIOLATION}' violated in '${FILE_PATH}'."
+  fi
 fi
 
 if [ "${TOOL_NAME}" = "Bash" ]; then

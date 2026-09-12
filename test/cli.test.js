@@ -57,6 +57,16 @@ describe('init', () => {
     assert.ok(!commands.some((command) => command.includes('pre-check')));
   });
 
+  it('uses a single dispatcher hook for --lang all', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-all-'));
+    const result = initProject(tmp, { lang: 'all', packageRoot: repoRoot });
+    const settings = JSON.parse(fs.readFileSync(result.settingsPath, 'utf8'));
+    assert.equal(settings.hooks.PreToolUse.length, 1);
+    assert.equal(settings.hooks.PostToolUse.length, 1);
+    assert.match(settings.hooks.PreToolUse[0].hooks[0].command, /pre-check/);
+    assert.ok(fs.existsSync(path.join(tmp, '.cursor/rules/agent-governor.mdc')));
+  });
+
   it('auto-detects a polyglot repo', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-poly-'));
     fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"demo"}');
@@ -65,6 +75,9 @@ describe('init', () => {
     assert.ok(result.langs.includes('node'));
     assert.ok(result.langs.includes('native'));
     assert.ok(fs.existsSync(path.join(tmp, '.agent-governor/native/governor_guard.sh')));
+    const settings = JSON.parse(fs.readFileSync(result.settingsPath, 'utf8'));
+    assert.equal(settings.hooks.PreToolUse.length, 1);
+    assert.match(settings.hooks.PreToolUse[0].hooks[0].command, /pre-check/);
   });
 });
 
