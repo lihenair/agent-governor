@@ -1,0 +1,40 @@
+{
+  "protectedFiles": [
+    "tsconfig.json",
+    "package.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "setup.py",
+    "Cargo.toml",
+    "Cargo.lock",
+    "go.mod",
+    "go.sum",
+    "CMakeLists.txt",
+    "Makefile",
+    "pubspec.yaml",
+    "Podfile",
+    "build.gradle",
+    ".eslintrc",
+    "biome.json"
+  ],
+  "protectedDirectories": [
+    ".claude/",
+    ".agent-governor/"
+  ],
+  "forbiddenBashPatterns": [
+    "git commit.*--no-verify",
+    "rm -rf \\.git",
+    "pip install --insecure",
+    "cargo publish --no-verify",
+    "git push.*--force"
+  ],
+  "astRules": {
+    "noDirectEval": true,
+    "noNewFunction": true,
+    "requireErrorBoundary": false,
+    "pythonForbiddenCalls": ["eval", "exec"],
+    "pythonDeprecatedImports": ["imp", "optparse"],
+    "rustForbidUnsafe": true,
+    "goForbidPanic": true
+  }
+}

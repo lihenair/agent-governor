@@ -1,0 +1,65 @@
+{
+  "name": "agent-governor",
+  "version": "0.1.0",
+  "description": "Deterministic Runtime Guardrails for Claude Code & AI Coding Agents",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "agent-governor": "./bin/governor.js",
+    "governor": "./bin/governor.js"
+  },
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./pre-tool-use": "./src/pre-tool-use.js",
+    "./post-tool-use": "./src/post-tool-use.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "dist",
+    "python",
+    "native",
+    "governor.config.example.json",
+    "README.md",
+    "README_ZH.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test --test-reporter=spec test/*.test.js",
+    "build": "node scripts/build.js",
+    "prepublishOnly": "npm test && npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude-code",
+    "hooks",
+    "guardrails",
+    "ai-agents",
+    "security",
+    "ast",
+    "policy",
+    "python",
+    "rust",
+    "golang",
+    "polyglot"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lihenair/agent-governor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lihenair/agent-governor/issues"
+  },
+  "homepage": "https://github.com/lihenair/agent-governor#readme",
+  "author": "lihenair",
+  "dependencies": {
+    "@babel/parser": "^7.28.0",
+    "@babel/traverse": "^7.28.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.9"
+  }
+}
