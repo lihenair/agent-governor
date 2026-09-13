@@ -136,6 +136,8 @@ npx agent-governor init --lang python   # 可选：只用标准库 ast
 
 也可以只用 `npx agent-governor hook`（读取 `hook_event_name`）。
 
+`--lang python` 仍安装零依赖的 `python3 .agent-governor/python/*.py`。`native/governor_guard.sh` 目前仍调用 `python3`；若 PATH 中没有 python3，native hook **fail-closed**（stderr 报错并 exit 2），不再静默放行。决策见 [ADR 0001](./docs/adr/0001-native-runtime.md)。
+
 ---
 
 ## ⚙️ 配置
