@@ -6,6 +6,7 @@ import {
 } from '../config.js';
 import { formatInspectBlock, inspectSource } from '../inspect.js';
 import { collectCapabilities, parseBash } from '../parser/bash.js';
+import { protectedWriteViaBash } from '../bash-write.js';
 import { CAPABILITY_DENY_ORDER } from '../parser/capabilities.js';
 
 function blockMessage(body) {
@@ -157,6 +158,20 @@ export function compilePreToolPolicy(config) {
           return blockMessage(
             `You are prohibited from editing protected configuration file "${fileName}" via Bash.\n` +
               `Fix the underlying source code issues instead of tampering with build/lint/typecheck configurations.`
+          );
+        },
+      },
+      {
+        id: 'protected-write-argv',
+        action: 'deny',
+        match(ctx) {
+          return ctx.toolName === 'Bash' && Boolean(protectedWriteViaBash(ctx.command, config, ctx.projectRoot));
+        },
+        reason(ctx) {
+          const viaArgv = protectedWriteViaBash(ctx.command, config, ctx.projectRoot);
+          return blockMessage(
+            `You are prohibited from editing protected configuration file "${viaArgv}" via Bash.\n` +
+              `Fix the underlying code issues instead of tampering with build/lint/typecheck configurations.`
           );
         },
       },
