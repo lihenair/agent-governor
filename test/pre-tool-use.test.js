@@ -40,6 +40,34 @@ describe('protected directory matching', () => {
       false
     );
   });
+
+  it('does not block another project .claude path outside repoRoot', () => {
+    assert.equal(
+      isProtectedDirectory('/tmp/other/.claude/x', CONFIG, '/repo'),
+      false
+    );
+  });
+
+  it('does not block nested node_modules/.claude paths', () => {
+    assert.equal(
+      isProtectedDirectory('/repo/node_modules/pkg/.claude/x', CONFIG, '/repo'),
+      false
+    );
+  });
+
+  it('still blocks repoRoot/.claude/settings.json', () => {
+    assert.equal(
+      isProtectedDirectory('/repo/.claude/settings.json', CONFIG, '/repo'),
+      true
+    );
+  });
+
+  it('blocks repoRoot/.agent-governor files via relative prefix', () => {
+    assert.equal(
+      isProtectedDirectory('/repo/.agent-governor/python/pre_tool_use.py', CONFIG, '/repo'),
+      true
+    );
+  });
 });
 
 describe('evaluatePreToolUse — config shield', () => {
