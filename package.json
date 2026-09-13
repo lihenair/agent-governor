@@ -59,7 +59,8 @@
   "author": "lihenair",
   "dependencies": {
     "@babel/parser": "^7.28.0",
-    "@babel/traverse": "^7.28.0"
+    "@babel/traverse": "^7.28.0",
+    "shell-quote": "^1.10.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.9"

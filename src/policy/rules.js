@@ -5,6 +5,8 @@ import {
   isWriteTool,
 } from '../config.js';
 import { formatInspectBlock, inspectSource } from '../inspect.js';
+import { collectCapabilities, parseBash } from '../parser/bash.js';
+import { CAPABILITY_DENY_ORDER } from '../parser/capabilities.js';
 
 function blockMessage(body) {
   return `[Agent Governor Security Alert] 🛑 GOVERNOR BLOCK: ${body}`;
@@ -120,6 +122,18 @@ export function compilePreToolPolicy(config) {
           );
         },
       },
+      ...CAPABILITY_DENY_ORDER.map((cap) => ({
+        id: cap,
+        action: 'deny',
+        match(ctx) {
+          return ctx.toolName === 'Bash' && (ctx.capabilities || []).includes(cap);
+        },
+        reason(ctx) {
+          return blockMessage(
+            `The bash command "${ctx.command}" violates repository safety rules (${cap}).`
+          );
+        },
+      })),
       {
         id: 'forbidden-bash',
         action: 'deny',
@@ -143,6 +157,21 @@ export function compilePreToolPolicy(config) {
           return blockMessage(
             `You are prohibited from editing protected configuration file "${fileName}" via Bash.\n` +
               `Fix the underlying source code issues instead of tampering with build/lint/typecheck configurations.`
+          );
+        },
+      },
+      {
+        id: 'process.spawn.dynamic',
+        action: 'ask',
+        match(ctx) {
+          return ctx.toolName === 'Bash' && (ctx.capabilities || []).includes('process.spawn.dynamic');
+        },
+        reason(ctx) {
+          return (
+            `[Agent Governor] ask required for dynamic process spawn (python -c / node -e / npx / make / docker / bash -c).
+` +
+            `Hook protocol cannot prompt; denying. Copy to run manually:
+${ctx.command}`
           );
         },
       },
