@@ -21,13 +21,13 @@ function runGovernor(args, { cwd } = {}) {
 }
 
 describe('dry-run test CLI (T1.4)', () => {
-  it('denies git push --force with forbidden-bash ruleId', () => {
+  it('denies git push --force with git.push.force ruleId', () => {
     const report = runDryTest(
       { command: 'git push --force' },
       { config: CONFIG, projectRoot: '/repo' }
     );
     assert.equal(report.decision, 'deny');
-    assert.equal(report.ruleId, 'forbidden-bash');
+    assert.equal(report.ruleId, 'git.push.force');
     assert.match(report.reason, /violates repository safety rules/);
     assert.ok(report.suggestion);
   });
@@ -59,7 +59,7 @@ describe('dry-run test CLI (T1.4)', () => {
     assert.equal(result.status, 0, result.stderr);
     const parsed = JSON.parse(result.stdout);
     assert.equal(parsed.decision, 'deny');
-    assert.equal(parsed.ruleId, 'forbidden-bash');
+    assert.equal(parsed.ruleId, 'git.push.force');
   });
 });
 
@@ -67,7 +67,7 @@ describe('explain CLI', () => {
   it('lists compiled rule ids from the default policy', () => {
     const text = explainConfig(CONFIG);
     assert.match(text, /protected-file/);
-    assert.match(text, /forbidden-bash/);
+    assert.match(text, /git\.push\.force/);
     assert.match(text, /defaultAction: allow/);
   });
 
