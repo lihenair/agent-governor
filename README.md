@@ -151,7 +151,7 @@ Or a single command that reads `hook_event_name`:
 npx agent-governor hook
 ```
 
-`--lang python` still installs zero-dep `python3 .agent-governor/python/*.py` hooks. The Bash native guard remains in the package for air-gapped Unix boxes, but the default path is Node so Windows works without `bash`/`python3`.
+`--lang python` still installs zero-dep `python3 .agent-governor/python/*.py` hooks. The Bash native guard remains in the package for air-gapped Unix boxes, but the default path is Node so Windows works without `bash`/`python3`. `native/governor_guard.sh` still shells out to `python3` today; if it is missing the hook **fails closed** (exit 2) instead of silently allowing every tool call. See [ADR 0001](./docs/adr/0001-native-runtime.md).
 
 ---
 
@@ -188,6 +188,30 @@ One JSON file is shared by the Node, Python, and native runtimes:
     "pythonDeprecatedImports": ["imp", "optparse"],
     "rustForbidUnsafe": true,
     "goForbidPanic": false,
+    "dartForbidMirrors": true,
+    "swiftForbidForceTry": true,
+    "kotlinForbidBangBang": true,
+    "cppForbidUnsafeC": true,
+    "javaForbidRuntimeExec": true
+  }
+}
+```
+
+List fields **union** with built-in defaults unless you opt out:
+
+| Field | Meaning |
+| --- | --- |
+| `protectedFiles` (no flags) | Union with defaults. User entries are added; defaults stay. |
+| `unprotect` | Subtract names from the merged `protectedFiles` list (`["tsconfig.json"]` makes that file writable). |
+| `override: true` | Replace default lists entirely with whatever you set (`protectedFiles` becomes only your array). |
+
+`unprotect` is “subtract from defaults”. `override` is “ignore defaults”. Do not combine them unless you want both: replace, then subtract.
+
+```json
+{
+  "unprotect": ["tsconfig.json"]
+}
+```,
     "dartForbidMirrors": true,
     "swiftForbidForceTry": true,
     "kotlinForbidBangBang": true,

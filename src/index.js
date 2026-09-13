@@ -1,7 +1,13 @@
 export { CONFIG, loadConfig, mergeConfig, toJsonConfig } from './config.js';
 export { evaluatePreToolUse, runPreToolUseGuard } from './pre-tool-use.js';
+export { evaluate } from './policy/engine.js';
+export { validatePolicy } from './policy/schema.js';
+export { compilePreToolPolicy } from './policy/rules.js';
 export { evaluatePostToolUse, inspectAST, runPostToolUseGuard } from './post-tool-use.js';
 export { inspectSource, languageIdFor } from './inspect.js';
+export { parseBash, collectCapabilities } from './parser/bash.js';
+export { computeHashes, ensureSelfProtect, verifyHashes } from './self-protect.js';
+export { logDecision } from './audit/logger.js';
 export { evaluateHook, runHookGuard } from './dispatch.js';
 export {
   detectLanguages,

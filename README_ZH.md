@@ -136,6 +136,8 @@ npx agent-governor init --lang python   # 可选：只用标准库 ast
 
 也可以只用 `npx agent-governor hook`（读取 `hook_event_name`）。
 
+`--lang python` 仍安装零依赖的 `python3 .agent-governor/python/*.py`。`native/governor_guard.sh` 目前仍调用 `python3`；若 PATH 中没有 python3，native hook **fail-closed**（stderr 报错并 exit 2），不再静默放行。决策见 [ADR 0001](./docs/adr/0001-native-runtime.md)。
+
 ---
 
 ## ⚙️ 配置
@@ -162,6 +164,22 @@ npx agent-governor init --lang python   # 可选：只用标准库 ast
 ```
 
 可复制 [`governor.config.example.json`](./governor.config.example.json)。
+
+默认是**并集**：你写的 `protectedFiles` 会加到内置名单上，不能靠省略来拿掉 `tsconfig.json`。
+
+| 字段 | 语义 |
+| --- | --- |
+| `protectedFiles`（无开关） | 与默认并集 |
+| `unprotect` | 从合并后的名单里减去，例如 `["tsconfig.json"]` 之后该文件可写 |
+| `override: true` | 完全替换默认名单，只用你提供的数组 |
+
+`unprotect` 是只减不增；`override` 是丢掉默认。
+
+```json
+{
+  "unprotect": ["tsconfig.json"]
+}
+```
 
 ---
 

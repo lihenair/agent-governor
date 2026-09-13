@@ -40,6 +40,34 @@ describe('protected directory matching', () => {
       false
     );
   });
+
+  it('does not block another project .claude path outside repoRoot', () => {
+    assert.equal(
+      isProtectedDirectory('/tmp/other/.claude/x', CONFIG, '/repo'),
+      false
+    );
+  });
+
+  it('does not block nested node_modules/.claude paths', () => {
+    assert.equal(
+      isProtectedDirectory('/repo/node_modules/pkg/.claude/x', CONFIG, '/repo'),
+      false
+    );
+  });
+
+  it('still blocks repoRoot/.claude/settings.json', () => {
+    assert.equal(
+      isProtectedDirectory('/repo/.claude/settings.json', CONFIG, '/repo'),
+      true
+    );
+  });
+
+  it('blocks repoRoot/.agent-governor files via relative prefix', () => {
+    assert.equal(
+      isProtectedDirectory('/repo/.agent-governor/python/pre_tool_use.py', CONFIG, '/repo'),
+      true
+    );
+  });
 });
 
 describe('evaluatePreToolUse — config shield', () => {
@@ -170,5 +198,29 @@ describe('mergeConfig', () => {
       '/repo'
     );
     assert.equal(result.exitCode, 2);
+  });
+
+  it('removes defaults listed in unprotect', () => {
+    const merged = mergeConfig(CONFIG, { unprotect: ['tsconfig.json'] });
+    assert.equal(merged.protectedFiles.includes('tsconfig.json'), false);
+    assert.ok(merged.protectedFiles.includes('package.json'));
+    const result = evaluatePreToolUse(
+      {
+        tool_name: 'Write',
+        tool_input: { file_path: '/repo/tsconfig.json', content: '{}' },
+      },
+      merged,
+      '/repo'
+    );
+    assert.equal(result.exitCode, 0);
+  });
+
+  it('replaces default lists when override is true', () => {
+    const merged = mergeConfig(CONFIG, {
+      override: true,
+      protectedFiles: ['only-me.lock'],
+    });
+    assert.deepEqual(merged.protectedFiles, ['only-me.lock']);
+    assert.equal(merged.protectedFiles.includes('tsconfig.json'), false);
   });
 });
