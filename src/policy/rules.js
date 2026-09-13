@@ -168,8 +168,10 @@ export function compilePreToolPolicy(config) {
         },
         reason(ctx) {
           return (
-            `[Agent Governor] ask required for dynamic process spawn (python -c / node -e / npx / make / docker / bash -c).\n` +
-            `Hook protocol cannot prompt; denying. Copy to run manually:\n${ctx.command}`
+            `[Agent Governor] ask required for dynamic process spawn (python -c / node -e / npx / make / docker / bash -c).
+` +
+            `Hook protocol cannot prompt; denying. Copy to run manually:
+${ctx.command}`
           );
         },
       },

@@ -6,6 +6,8 @@ export { compilePreToolPolicy } from './policy/rules.js';
 export { evaluatePostToolUse, inspectAST, runPostToolUseGuard } from './post-tool-use.js';
 export { inspectSource, languageIdFor } from './inspect.js';
 export { parseBash, collectCapabilities } from './parser/bash.js';
+export { computeHashes, ensureSelfProtect, verifyHashes } from './self-protect.js';
+export { logDecision } from './audit/logger.js';
 export { evaluateHook, runHookGuard } from './dispatch.js';
 export {
   detectLanguages,

@@ -10,6 +10,8 @@ import {
 } from './config.js';
 import { extractWriteSnippets } from './inspect.js';
 import { collectCapabilities, parseBash } from './parser/bash.js';
+import { logGuardDecision } from './audit/logger.js';
+import { ensureSelfProtect, mergeProtectResult } from './self-protect.js';
 import { evaluate } from './policy/engine.js';
 import { compilePreToolPolicy } from './policy/rules.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
@@ -52,13 +54,25 @@ export async function runPreToolUseGuard({
   load = loadConfig,
 } = {}) {
   const payload = await readStdin(stdin);
-  if (!payload || !payload.tool_name) {
-    return { exitCode: 0 };
-  }
-
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
-  return evaluatePreToolUse(payload, config, projectRoot);
+  const started = Date.now();
+  const protect = ensureSelfProtect(projectRoot, { failureMode: config.failureMode });
+
+  let result;
+  if (!payload || !payload.tool_name) {
+    result = mergeProtectResult(protect, { exitCode: 0 });
+  } else {
+    result = mergeProtectResult(protect, evaluatePreToolUse(payload, config, projectRoot));
+  }
+
+  logGuardDecision(payload, result, {
+    repoRoot: projectRoot,
+    hook: 'PreToolUse',
+    duration_ms: Date.now() - started,
+    failure_mode: config.failureMode || 'open',
+  });
+  return result;
 }
 
 async function main() {
