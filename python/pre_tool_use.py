@@ -26,13 +26,26 @@ DEFAULT_CONFIG = {
         "governor.config.json",
     ],
     "protectedDirectories": [".claude/", ".agent-governor/"],
+    # Keep in sync with src/config.js forbiddenBashPatterns (Node defaults).
     "forbiddenBashPatterns": [
-        r"git commit.*--no-verify",
-        r"rm -rf \.git",
-        r"pip install --insecure",
-        r"cargo publish --no-verify",
+        r"git\s+commit[\s\S]*--no-verify",
+        r"git\s+push[\s\S]*--no-verify",
+        r"rm\s+-rf\s+\.git\b",
+        r"npm\s+set\s+strict-ssl\s+false",
+        r"pip(?:3)?\s+install[\s\S]*--insecure",
+        r"cargo\s+publish[\s\S]*--no-verify",
+        r"git\s+push[\s\S]*--force(?:-with-lease)?",
+        r"git\s+push[\s\S]*\s-f\s+(?:origin\s+)?(?:main|master)\b",
     ],
 }
+
+# Lightweight capability subset — not a copy of the Node engine.
+CAPABILITY_PATTERNS = (
+    ("git.push.force", re.compile(r"git[\s'\",\]]+push[\s\S]{0,80}(?:--force(?:-with-lease)?|\s-f\b)", re.I | re.DOTALL)),
+    ("git.hook.bypass", re.compile(r"--no-verify", re.I)),
+    ("fs.delete", re.compile(r"(?:^|[\s;|&/])rm\s+-r?f|shutil\.rmtree", re.I)),
+    ("fs.write", re.compile(r"(?:^|[\s;|&])(?:tee|sed\s+-i|sed\s+--in-place)|(?:^|[\s])>{1,2}", re.I)),
+)
 
 
 def project_root() -> str:
@@ -124,8 +137,15 @@ def main() -> int:
 
     elif tool_name == "Bash":
         command = tool_input.get("command", "")
+        for cap, pattern in CAPABILITY_PATTERNS:
+            if pattern.search(command):
+                sys.stderr.write(
+                    "[Agent Governor Security Alert] 🛑 GOVERNOR BLOCK: "
+                    f"The bash command '{command}' violates security rules ({cap}).\n"
+                )
+                return 2
         for pattern in config.get("forbiddenBashPatterns", []):
-            if re.search(pattern, command, re.IGNORECASE):
+            if re.search(pattern, command, re.IGNORECASE | re.DOTALL):
                 sys.stderr.write(
                     "[Agent Governor Security Alert] 🛑 GOVERNOR BLOCK: "
                     f"The bash command '{command}' violates security rules.\n"
