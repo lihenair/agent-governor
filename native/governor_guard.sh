@@ -3,6 +3,11 @@
 # Covers Rust, Go, C/C++, Flutter, and other non-JS stacks in < 15ms.
 set -eu
 
+if ! command -v python3 >/dev/null 2>&1; then
+  printf '%s\n' 'agent-governor: python3 not found, failing closed' >&2
+  exit 2
+fi
+
 PAYLOAD="$(cat || true)"
 if [ -z "${PAYLOAD}" ]; then
   exit 0
