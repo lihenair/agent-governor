@@ -197,6 +197,30 @@ One JSON file is shared by the Node, Python, and native runtimes:
 }
 ```
 
+List fields **union** with built-in defaults unless you opt out:
+
+| Field | Meaning |
+| --- | --- |
+| `protectedFiles` (no flags) | Union with defaults. User entries are added; defaults stay. |
+| `unprotect` | Subtract names from the merged `protectedFiles` list (`["tsconfig.json"]` makes that file writable). |
+| `override: true` | Replace default lists entirely with whatever you set (`protectedFiles` becomes only your array). |
+
+`unprotect` is “subtract from defaults”. `override` is “ignore defaults”. Do not combine them unless you want both: replace, then subtract.
+
+```json
+{
+  "unprotect": ["tsconfig.json"]
+}
+```,
+    "dartForbidMirrors": true,
+    "swiftForbidForceTry": true,
+    "kotlinForbidBangBang": true,
+    "cppForbidUnsafeC": true,
+    "javaForbidRuntimeExec": true
+  }
+}
+```
+
 Copy [`governor.config.example.json`](./governor.config.example.json) to get started. `governor.config.cjs` is still accepted as a Node-only overlay.
 
 ---
