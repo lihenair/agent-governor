@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { CONFIG, loadConfig, mergeConfig } from './config.js';
+import { explainConfig, formatTestReport, runDryTest } from './dry-run.js';
 import { initProject, parseLangFlag } from './init.js';
 import { runHookGuard } from './dispatch.js';
 import { runPostToolUseGuard } from './post-tool-use.js';
@@ -37,8 +39,17 @@ Commands:
   hook         Auto Pre/Post dispatcher (reads hook_event_name from stdin)
   pre-check    Run the PreToolUse guard (stdin JSON)
   post-check   Run the PostToolUse source guard (stdin JSON)
+  test --command "git push --force"
+               Dry-run a Bash command against evaluatePreToolUse
+  test --file tsconfig.json [--operation modify|write]
+               Dry-run an Edit/Write against evaluatePreToolUse
+  explain [--config governor.config.json]
+               Print compiled rule ids and counts
   version      Print the package version
   help         Show this message
+
+Options:
+  --json       Machine-readable output for test
 `;
 
 
@@ -64,6 +75,31 @@ async function runGuard(kind) {
     emitBlock(`${prefix}: ${err.message}`);
     exitAllow();
   }
+}
+
+function parseFlags(argv) {
+  const flags = { _: [] };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--json') {
+      flags.json = true;
+    } else if (arg === '--command' || arg === '--file' || arg === '--operation' || arg === '--config') {
+      flags[arg.slice(2)] = argv[index + 1];
+      index += 1;
+    } else {
+      flags._.push(arg);
+    }
+  }
+  return flags;
+}
+
+async function loadExplainConfig(configPath, cwd = process.cwd()) {
+  if (!configPath) {
+    return loadConfig(cwd);
+  }
+  const abs = path.resolve(cwd, configPath);
+  const parsed = JSON.parse(fs.readFileSync(abs, 'utf8'));
+  return mergeConfig(CONFIG, parsed);
 }
 
 export async function runCli(argv = process.argv.slice(2)) {
@@ -92,6 +128,22 @@ export async function runCli(argv = process.argv.slice(2)) {
     case 'post':
       await runGuard('post');
       break;
+    case 'test': {
+      const flags = parseFlags(argv.slice(1));
+      const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      const config = await loadConfig(projectRoot);
+      const report = runDryTest(flags, { config, projectRoot });
+      process.stdout.write(formatTestReport(report, { json: Boolean(flags.json) }));
+      exitAllow();
+      break;
+    }
+    case 'explain': {
+      const flags = parseFlags(argv.slice(1));
+      const config = await loadExplainConfig(flags.config);
+      process.stdout.write(explainConfig(config));
+      exitAllow();
+      break;
+    }
     case 'version':
     case '--version':
     case '-v':
