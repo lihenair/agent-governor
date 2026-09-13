@@ -1,6 +1,7 @@
 import { loadConfig, resolveProjectRoot } from './config.js';
 import { evaluatePostToolUse } from './post-tool-use.js';
 import { evaluatePreToolUse } from './pre-tool-use.js';
+import { ensureSelfProtect, mergeProtectResult } from './self-protect.js';
 import { readStdin } from './stdin.js';
 
 export async function evaluateHook(payload, config, projectRoot, io) {
@@ -13,10 +14,13 @@ export async function evaluateHook(payload, config, projectRoot, io) {
 
 export async function runHookGuard({ stdin = process.stdin, load = loadConfig, io } = {}) {
   const payload = await readStdin(stdin);
-  if (!payload || !payload.tool_name) {
-    return { exitCode: 0 };
-  }
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
-  return evaluateHook(payload, config, projectRoot, io);
+  const protect = ensureSelfProtect(projectRoot, { failureMode: config.failureMode });
+
+  if (!payload || !payload.tool_name) {
+    return mergeProtectResult(protect, { exitCode: 0 });
+  }
+
+  return mergeProtectResult(protect, await evaluateHook(payload, config, projectRoot, io));
 }

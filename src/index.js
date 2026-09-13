@@ -5,6 +5,7 @@ export { validatePolicy } from './policy/schema.js';
 export { compilePreToolPolicy } from './policy/rules.js';
 export { evaluatePostToolUse, inspectAST, runPostToolUseGuard } from './post-tool-use.js';
 export { inspectSource, languageIdFor } from './inspect.js';
+export { computeHashes, ensureSelfProtect, verifyHashes } from './self-protect.js';
 export { evaluateHook, runHookGuard } from './dispatch.js';
 export {
   detectLanguages,
