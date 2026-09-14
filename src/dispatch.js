@@ -1,6 +1,7 @@
 import { loadConfig, resolveProjectRoot } from './config.js';
 import { evaluatePostToolUse } from './post-tool-use.js';
 import { evaluatePreToolUse } from './pre-tool-use.js';
+import { evaluateReadScan } from './read-guard.js';
 import { logGuardDecision } from './audit/logger.js';
 import { ensureSelfProtect, mergeProtectResult } from './self-protect.js';
 import { readStdin } from './stdin.js';
@@ -8,7 +9,15 @@ import { readStdin } from './stdin.js';
 export async function evaluateHook(payload, config, projectRoot, io) {
   const event = payload?.hook_event_name || payload?.hookEventName || '';
   if (event === 'PostToolUse') {
-    return evaluatePostToolUse(payload, config, io);
+    const result = evaluatePostToolUse(payload, config, io);
+    if (result.exitCode === 0) {
+      // Read-side injection scan: PostToolUse on Read/WebFetch/etc.
+      const readScan = evaluateReadScan(payload, config, io);
+      if (readScan.exitCode === 2) {
+        return readScan;
+      }
+    }
+    return result;
   }
   return evaluatePreToolUse(payload, config, projectRoot);
 }

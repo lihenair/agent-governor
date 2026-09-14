@@ -6,6 +6,9 @@ import { initProject, parseLangFlag } from './init.js';
 import { runHookGuard } from './dispatch.js';
 import { runPostToolUseGuard } from './post-tool-use.js';
 import { runPreToolUseGuard } from './pre-tool-use.js';
+import { runSessionHook } from './session-context.js';
+import { buildReport, formatReport } from './report.js';
+import { getPreset } from './presets.js';
 import { emitBlock, exitAllow, exitBlock } from './stdin.js';
 
 function readVersion() {
@@ -39,17 +42,23 @@ Commands:
   hook         Auto Pre/Post dispatcher (reads hook_event_name from stdin)
   pre-check    Run the PreToolUse guard (stdin JSON)
   post-check   Run the PostToolUse source guard (stdin JSON)
+  session-hook --event SessionStart|PreCompact
+               Emit rule re-injection context (stdout) after session start
+               or context compaction
   test --command "git push --force"
                Dry-run a Bash command against evaluatePreToolUse
   test --file tsconfig.json [--operation modify|write]
                Dry-run an Edit/Write against evaluatePreToolUse
   explain [--config governor.config.json]
                Print compiled rule ids and counts
+  report       Summarize the audit log: blocks, top rules, last intervention
   version      Print the package version
   help         Show this message
 
 Options:
   --json       Machine-readable output for test
+  --preset <name|a,b>
+               Apply a policy pack: security-hard | frontend | python | strict
 `;
 
 
@@ -83,7 +92,7 @@ function parseFlags(argv) {
     const arg = argv[index];
     if (arg === '--json') {
       flags.json = true;
-    } else if (arg === '--command' || arg === '--file' || arg === '--operation' || arg === '--config') {
+    } else if (arg === '--command' || arg === '--file' || arg === '--operation' || arg === '--config' || arg === '--event' || arg === '--tail') {
       flags[arg.slice(2)] = argv[index + 1];
       index += 1;
     } else {
@@ -103,7 +112,20 @@ async function loadExplainConfig(configPath, cwd = process.cwd()) {
 }
 
 export async function runCli(argv = process.argv.slice(2)) {
-  const command = argv[0] || 'help';
+  // Global --preset flag: apply preset for the lifetime of this invocation.
+  const presetIndex = argv.findIndex((arg) => arg === '--preset' || arg.startsWith('--preset='));
+  if (presetIndex !== -1) {
+    const value = argv[presetIndex].startsWith('--preset=')
+      ? argv[presetIndex].slice('--preset='.length)
+      : argv[presetIndex + 1];
+    if (value && value !== 'undefined') {
+      // Validate early so typos fail fast with a clear message.
+      getPreset(value);
+      process.env.GOVERNOR_PRESET = value;
+    }
+  }
+
+  const command = argv[0] === '--preset' || argv[0]?.startsWith('--preset=') ? argv[1] || 'help' : argv[0] || 'help';
 
   switch (command) {
     case 'init': {
@@ -128,6 +150,16 @@ export async function runCli(argv = process.argv.slice(2)) {
     case 'post':
       await runGuard('post');
       break;
+    case 'session-hook': {
+      const flags = parseFlags(argv.slice(1));
+      const event = flags.event || 'SessionStart';
+      const result = await runSessionHook({ event, projectRoot: process.env.CLAUDE_PROJECT_DIR || process.cwd() });
+      if (result.stdout) {
+        process.stdout.write(`${result.stdout}\n`);
+      }
+      exitAllow();
+      break;
+    }
     case 'test': {
       const flags = parseFlags(argv.slice(1));
       const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
@@ -141,6 +173,18 @@ export async function runCli(argv = process.argv.slice(2)) {
       const flags = parseFlags(argv.slice(1));
       const config = await loadExplainConfig(flags.config);
       process.stdout.write(explainConfig(config));
+      exitAllow();
+      break;
+    }
+    case 'report': {
+      const flags = parseFlags(argv.slice(1));
+      const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      const report = buildReport(projectRoot, { tail: flags.tail ? Number(flags.tail) : undefined });
+      process.stdout.write(
+        flags.json
+          ? `${JSON.stringify(report, null, 2)}\n`
+          : formatReport(report)
+      );
       exitAllow();
       break;
     }

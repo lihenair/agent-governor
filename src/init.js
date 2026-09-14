@@ -9,10 +9,19 @@ export const DEFAULT_HOOK_COMMANDS = {
   pythonPre: 'python3 .agent-governor/python/pre_tool_use.py',
   pythonPost: 'python3 .agent-governor/python/post_tool_use.py',
   native: 'bash .agent-governor/native/governor_guard.sh',
+  sessionStart: 'npx agent-governor session-hook --event SessionStart',
+  preCompact: 'npx agent-governor session-hook --event PreCompact',
+  readScan: 'npx agent-governor post-check',
 };
 
 const WRITE_MATCHER = 'Edit|Write|MultiEdit|NotebookEdit';
 const PRE_MATCHER = `${WRITE_MATCHER}|Bash`;
+const READ_MATCHER = 'Read|WebFetch|WebSearch';
+const SESSION_COMMANDS = {
+  sessionStart: 'npx agent-governor session-hook --event SessionStart',
+  preCompact: 'npx agent-governor session-hook --event PreCompact',
+  readScan: 'npx agent-governor post-check',
+};
 
 function commandHook(matcher, command) {
   return {
@@ -25,16 +34,19 @@ export function hookSettingsFor(langs = ['node']) {
   const selected = new Set(langs.includes('all') ? ['node'] : langs);
   const pythonOnly = selected.size === 1 && selected.has('python');
 
-  if (pythonOnly) {
-    return {
-      PreToolUse: [commandHook(PRE_MATCHER, DEFAULT_HOOK_COMMANDS.pythonPre)],
-      PostToolUse: [commandHook(WRITE_MATCHER, DEFAULT_HOOK_COMMANDS.pythonPost)],
-    };
-  }
+  const preCommand = pythonOnly ? DEFAULT_HOOK_COMMANDS.pythonPre : DEFAULT_HOOK_COMMANDS.nodePre;
+  const postCommand = pythonOnly ? DEFAULT_HOOK_COMMANDS.pythonPost : DEFAULT_HOOK_COMMANDS.nodePost;
 
   return {
-    PreToolUse: [commandHook(PRE_MATCHER, DEFAULT_HOOK_COMMANDS.nodePre)],
-    PostToolUse: [commandHook(WRITE_MATCHER, DEFAULT_HOOK_COMMANDS.nodePost)],
+    PreToolUse: [commandHook(PRE_MATCHER, preCommand)],
+    PostToolUse: [
+      commandHook(WRITE_MATCHER, postCommand),
+      // Read-side injection scanning shares the post-check entry point.
+      commandHook(READ_MATCHER, SESSION_COMMANDS.readScan),
+    ],
+    // Context re-injection: rules survive compaction and fresh sessions.
+    SessionStart: [commandHook('*', SESSION_COMMANDS.sessionStart)],
+    PreCompact: [commandHook('*', SESSION_COMMANDS.preCompact)],
   };
 }
 

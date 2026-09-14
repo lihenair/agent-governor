@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-09-15
+
+### Added
+
+- **Read-side injection scanning (industry first)**: `PostToolUse` hooks on
+  `Read` / `WebFetch` / `WebSearch` scan incoming content for prompt injection
+  — instruction override, role hijack, `curl | sh` payloads, env/secret
+  exfiltration, zero-width Unicode smuggling. Weighted scoring: ≥2 blocks and
+  feeds the reason back to the agent. Configure via `injectionMode` and
+  `injectionPatterns` in `governor.config.json`.
+- **Rule re-injection on SessionStart / PreCompact**: `init` now wires session
+  hooks that re-inject active-policy context after a fresh session or context
+  compaction — including how many times the agent has been blocked. New CLI
+  command `session-hook`.
+- **Preset policy packs**: `--preset security-hard|frontend|python|strict` (or
+  the `preset` field in `governor.config.json`, or the `GOVERNOR_PRESET` env
+  var). Presets extend the default shield with supply-chain files (`.env`,
+  `Dockerfile`, CI workflows), web/data toolchain configs, and stricter AST
+  flags. Presets compose (`--preset a,b`); user config always wins.
+- **`governor report`**: aggregate the audit log into a digest — total blocks,
+  block rate, top triggered rules, per-hook counts, and the last intervention
+  with a redacted preview. `--json` for machines.
+
+### Changed
+
+- `init` writes four hook groups by default: PreToolUse (write+bash),
+  PostToolUse (write), PostToolUse (read-scan), SessionStart, PreCompact.
+
 ## [0.2.0] - 2026-09-14
 
 ### Added

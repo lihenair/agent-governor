@@ -78,6 +78,10 @@ Claude Code sends each event as JSON on stdin (`tool_name`, `tool_input`, `cwd`,
 * 🛡️ **Zero-Trust Config Shield**: Locks toolchain manifests across JS, Python, Rust, Go, Flutter, iOS, and Android.
 * ⚡ **Single dispatcher**: one PreToolUse + one PostToolUse hook. File extension picks the inspector (no triple-hook lag).
 * 🧠 **Polyglot source policy** driven by `governor.config.json` `astRules` (flags are real, not docs-only).
+* 📖 **Read-side injection scanning (industry first)**: PostToolUse guard inspects what agents *read* — fetched web pages, files, search results — and blocks `ignore previous instructions`, `curl | sh`, and secret-exfiltration payloads before the agent obeys them. Nobody else checks the input side.
+* 🔄 **Rule re-injection on SessionStart / PreCompact**: governance context survives context compaction — the agent cannot "forget" the guardrails exactly when its memory gets wiped.
+* 🎒 **Preset policy packs**: `--preset security-hard|frontend|python|strict` — one flag for an opinionated baseline (`.env`, Dockerfile, CI workflows, lockfiles, bundler configs).
+* 📊 **`governor report`**: turns the audit log into a digest — total blocks, top triggered rules, last intervention. Perfect for your README and retro meetings.
 * 🪟 **Windows-safe default**: the dispatcher is Node. Bash/Python runtimes stay optional.
 * 📎 **Cursor soft adapter**: `init` writes `.cursor/rules/agent-governor.mdc` because Cursor has no PreToolUse hooks.
 
@@ -239,8 +243,47 @@ npx agent-governor init
 npx agent-governor hook
 npx agent-governor pre-check
 npx agent-governor post-check
+npx agent-governor session-hook --event SessionStart   # rule re-injection (auto-wired by init)
+npx agent-governor report                              # audit digest: blocks, top rules, last intervention
+npx agent-governor report --json
 npx agent-governor version
 ```
+
+### Preset policy packs
+
+One flag, an opinionated baseline — compose presets or use them standalone:
+
+```bash
+npx agent-governor explain --preset security-hard   # preview what gets protected
+GOVERNOR_PRESET=security-hard npx agent-governor test --command "npm install --force"
+```
+
+| Preset | Adds to the default shield |
+| --- | --- |
+| `security-hard` | `.env`, `Dockerfile`, `.github/workflows`, `.npmrc`, `npm install --force`, `curl \| sudo sh`, git identity tampering |
+| `frontend` | `vite.config.*`, `next.config.*`, `nuxt.config.*`, `svelte.config.*`, `tailwind.config.*`, `webpack.config.*` |
+| `python` | `poetry.lock`, `pdm.lock`, `uv.lock`, `tox.ini`, `conda.yaml` |
+| `strict` | all of the above + `goForbidPanic`, `requireErrorBoundary` |
+
+Or persist it in `governor.config.json` (file value wins over the env/flag):
+
+```json
+{
+  "preset": "security-hard"
+}
+```
+
+### Read-side injection scanning
+
+Every other guardrail watches what the agent **writes**. Agent Governor also watches what it **reads**:
+
+- PostToolUse hooks on `Read` / `WebFetch` / `WebSearch` scan incoming content.
+- Detectors: instruction override (`ignore previous instructions`), role hijack, `curl | sh` payloads, env/secret exfiltration, hidden zero-width Unicode smuggling.
+- Score ≥ 2 blocks and feeds the reason back to the agent; `injectionMode: "off"` disables it; `injectionPatterns` accepts your own regex detectors.
+
+### Session/compaction re-injection
+
+`init` wires `SessionStart` and `PreCompact` hooks automatically. After a context wipe or compaction, the governor re-injects a short reminder: which rules are active, how many times the agent has been blocked, and that the guardrails cannot be disabled from inside the session. Architecture drift dies at the exact moment it used to be born.
 
 ---
 

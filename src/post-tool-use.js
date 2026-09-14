@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG, extractFilePaths, isWriteTool, loadConfig, resolveProjectRoot } from './config.js';
 import { formatInspectBlock, inspectAST, inspectSource } from './inspect.js';
+import { evaluateReadScan } from './read-guard.js';
 import { logGuardDecision } from './audit/logger.js';
 import { ensureSelfProtect, mergeProtectResult } from './self-protect.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
@@ -65,7 +66,15 @@ export async function runPostToolUseGuard({
   if (!payload || !payload.tool_name) {
     result = mergeProtectResult(protect, { exitCode: 0 });
   } else {
-    result = mergeProtectResult(protect, evaluatePostToolUse(payload, config, io));
+    const base = evaluatePostToolUse(payload, config, io);
+    const readScan = base.exitCode === 0 ? evaluateReadScan(payload, config, io) : { exitCode: 0 };
+    let merged;
+    if (readScan.exitCode === 2) {
+      merged = { ...readScan, stderr: readScan.reason };
+    } else {
+      merged = base;
+    }
+    result = mergeProtectResult(protect, merged);
   }
 
   logGuardDecision(payload, result, {

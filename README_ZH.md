@@ -78,6 +78,10 @@ Claude Code 通过 stdin 以 JSON 传入事件（`tool_name`、`tool_input`、`c
 * 🛡️ **零信任配置盾**：覆盖 JS / Python / Rust / Go / Flutter / iOS / Android 的清单文件。
 * ⚡ **单一调度器**：默认只挂一条 Pre + 一条 Post Hook，按文件扩展名分发检查。
 * 🧠 **`astRules` 真正生效**：JSON 里的开关会驱动拦截，而不是写着好看。
+* 📖 **读取侧注入扫描（业界首创）**：PostToolUse 检查 agent *读到*的内容——抓取的网页、文件、搜索结果——在它照做之前拦下「ignore previous instructions」「curl \| sh」、密钥外传等 payload。别家只管写入侧，没人管输入侧。
+* 🔄 **SessionStart / PreCompact 规则重注入**：上下文压缩后治理提示自动重建——agent 恰好在记忆被清空的时刻也没法「忘记」护栏。
+* 🎒 **预设规则包**：`--preset security-hard\|frontend\|python\|strict`，一个旗标拿到有主见的基线（`.env`、Dockerfile、CI workflow、锁文件、打包器配置）。
+* 📊 **`governor report`**：把审计日志聚合成摘要——总拦截数、Top 触发规则、最近一次拦截。贴 README、开复盘会都好用。
 * 🪟 **默认 Windows 可用**：主路径是 Node；Bash / Python 运行时是可选的。
 * 📎 **Cursor 软适配**：`init` 会写入 `.cursor/rules/agent-governor.mdc`（Cursor 没有 PreToolUse）。
 
@@ -201,8 +205,47 @@ npx agent-governor init
 npx agent-governor hook
 npx agent-governor pre-check
 npx agent-governor post-check
+npx agent-governor session-hook --event SessionStart   # 规则重注入（init 自动接线）
+npx agent-governor report                              # 审计摘要：拦截数、Top 规则、最近一次拦截
+npx agent-governor report --json
 npx agent-governor version
 ```
+
+### 预设规则包
+
+一个旗标拿到有主见的基线，可组合、可独立用：
+
+```bash
+npx agent-governor explain --preset security-hard   # 预览会多保护哪些文件
+GOVERNOR_PRESET=security-hard npx agent-governor test --command "npm install --force"
+```
+
+| 预设 | 在默认盾之上新增 |
+| --- | --- |
+| `security-hard` | `.env`、`Dockerfile`、`.github/workflows`、`.npmrc`、`npm install --force`、`curl \| sudo sh`、改 git 身份 |
+| `frontend` | `vite.config.*`、`next.config.*`、`nuxt.config.*`、`svelte.config.*`、`tailwind.config.*`、`webpack.config.*` |
+| `python` | `poetry.lock`、`pdm.lock`、`uv.lock`、`tox.ini`、`conda.yaml` |
+| `strict` | 以上全部 + `goForbidPanic`、`requireErrorBoundary` |
+
+也可以写进 `governor.config.json`（文件里的值优先于环境变量 / 旗标）：
+
+```json
+{
+  "preset": "security-hard"
+}
+```
+
+### 读取侧注入扫描
+
+别家护栏只看 agent **写**什么。Agent Governor 还看它**读**什么：
+
+- PostToolUse 挂在 `Read` / `WebFetch` / `WebSearch` 上，扫描进入上下文的内容。
+- 检测器：指令覆盖（`ignore previous instructions`）、角色劫持、`curl \| sh` payload、env / 密钥外传、零宽字符隐写。
+- 评分 ≥ 2 拦截并把原因回传给 agent；`injectionMode: "off"` 关闭；`injectionPatterns` 支持自定义正则检测器。
+
+### 会话 / 压缩重注入
+
+`init` 自动接好 `SessionStart` 和 `PreCompact` Hook。上下文被清空或压缩后，governor 会重新注入一段简短提醒：哪些规则在生效、agent 被拦过几次、护栏不能从会话内部关闭。架构漂移死在它出生的那一刻。
 
 ---
 

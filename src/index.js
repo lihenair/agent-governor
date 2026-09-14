@@ -9,6 +9,9 @@ export { parseBash, collectCapabilities } from './parser/bash.js';
 export { computeHashes, ensureSelfProtect, verifyHashes } from './self-protect.js';
 export { logDecision } from './audit/logger.js';
 export { evaluateHook, runHookGuard } from './dispatch.js';
+export { buildSessionContext, runSessionHook, summarizeRecentBlocks } from './session-context.js';
+export { evaluateReadScan, scanForInjections, extractReadContent, isReadTool } from './read-guard.js';
+export { PRESET_NAMES, getPreset, hasPreset } from './presets.js';
 export {
   detectLanguages,
   initProject,

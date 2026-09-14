@@ -2,6 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
+import { getPreset, bindPresetsToConfig } from './presets.js';
+
+// Break the config <-> presets circular import: presets need the default
+// lists at preset-build time, config needs getPreset at load time.
+let _presetsBound = false;
+function ensurePresetsBound() {
+  if (!_presetsBound) {
+    bindPresetsToConfig(CONFIG);
+    _presetsBound = true;
+  }
+}
 
 /**
  * Default governance rules. Projects can override / extend these via
@@ -99,6 +110,18 @@ export const CONFIG = {
     cppForbidUnsafeC: true,
     javaForbidRuntimeExec: true,
   },
+
+  /**
+   * Read-side prompt injection scanning on Read/WebFetch/WebSearch content.
+   * 'scan' (default) = detect and block/ warn; 'off' = disable entirely.
+   */
+  injectionMode: 'scan',
+
+  /**
+   * Optional extra injection detectors: [{ id, weight, pattern }] where
+   * pattern is a regex source string (case-insensitive) or RegExp.
+   */
+  injectionPatterns: [],
 };
 
 const WRITE_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
@@ -193,10 +216,15 @@ export function toJsonConfig(config = CONFIG) {
       pattern instanceof RegExp ? pattern.source : String(pattern)
     ),
     astRules: config.astRules,
+    injectionMode: config.injectionMode || 'scan',
+    injectionPatterns: config.injectionPatterns || [],
   };
 }
 
 export async function loadConfig(cwd = process.cwd()) {
+  // Preset via env (set by `--preset` CLI flag) or governor.config.json field.
+  const presetName = process.env.GOVERNOR_PRESET || '';
+  ensurePresetsBound();
   const candidates = [
     path.join(cwd, 'governor.config.json'),
     path.join(cwd, 'governor.config.cjs'),
@@ -211,14 +239,18 @@ export async function loadConfig(cwd = process.cwd()) {
 
     if (filePath.endsWith('.json')) {
       const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      return mergeConfig(CONFIG, parsed);
+      // File-level `preset` field wins over the env var; both feed getPreset.
+      const preset = getPreset(parsed.preset || presetName);
+      return mergeConfig(mergeConfig(CONFIG, preset), parsed);
     }
 
     const loaded = await importConfigModule(filePath);
-    return mergeConfig(CONFIG, loaded);
+    const preset = getPreset(loaded?.preset || presetName);
+    return mergeConfig(mergeConfig(CONFIG, preset), loaded);
   }
 
-  return mergeConfig(CONFIG, {});
+  const preset = getPreset(presetName);
+  return mergeConfig(CONFIG, preset);
 }
 
 export function extractFilePaths(toolName, toolInput = {}) {
