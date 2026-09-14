@@ -211,14 +211,6 @@ List fields **union** with built-in defaults unless you opt out:
 {
   "unprotect": ["tsconfig.json"]
 }
-```,
-    "dartForbidMirrors": true,
-    "swiftForbidForceTry": true,
-    "kotlinForbidBangBang": true,
-    "cppForbidUnsafeC": true,
-    "javaForbidRuntimeExec": true
-  }
-}
 ```
 
 Copy [`governor.config.example.json`](./governor.config.example.json) to get started. `governor.config.cjs` is still accepted as a Node-only overlay.
