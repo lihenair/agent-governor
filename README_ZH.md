@@ -2,224 +2,94 @@
 
 # 🛡️ Agent Governor
 
-**面向 Claude Code 与 AI 编程 Agent 的确定性运行时护栏**
+**面向 Claude Code、Codex CLI 与 Gemini CLI 的确定性运行时护栏**
 
-*用硬件级 Hook 拦截提示注入、架构漂移与配置篡改。*
+*语法树级代码检查、读取侧提示注入扫描、硬件级 Hook——一份配置，守护三个编程 Agent。*
 
 [English](./README.md) | [简体中文](./README_ZH.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Claude Code Support](https://img.shields.io/badge/Claude%20Code-v1.0%2B-brightgreen.svg)](#)
+[![CI](https://github.com/lihenair/agent-governor/actions/workflows/ci.yml/badge.svg)](https://github.com/lihenair/agent-governor/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/agent-governor.svg)](https://www.npmjs.com/package/agent-governor)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/lihenair/agent-governor/pulls)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-green.svg)](#)
-[![Python](https://img.shields.io/badge/Python-3.9%2B%20zero--dep-3776AB.svg)](#)
-[![Rust / Go / C++](https://img.shields.io/badge/Rust%20%7C%20Go%20%7C%20C%2B%2B-native-orange.svg)](#)
-[![Flutter / Mobile](https://img.shields.io/badge/Flutter%20%7C%20iOS%20%7C%20Android-polyglot-blue.svg)](#)
 
 </div>
 
 <br />
 
-<div align="center">
-  <img src="docs/demo.svg" alt="Agent Governor Demo" width="800px" />
-  <p><em>左：无护栏时 Agent 直接改 tsconfig.json 绕过类型错误。<br/>右：Agent Governor 的 PreToolUse Hook 拦截写入，并迫使 Agent 修复源码。</em></p>
-</div>
-
 ---
 
 ## ⚡ 要解决什么问题
 
-现代 AI Agent（Claude Code、Cursor、OpenCode）很快，但存在 **非确定性与上下文漂移**：
+AI 编程 Agent 很快，但存在**非确定性与上下文漂移**：
 
-* 🚫 **篡改配置**：遇到编译/ lint 错误时，Agent 常常去改 `tsconfig.json`、`biome.json`、`.eslintrc`，而不是修真正的 bug。
-* 🌀 **架构漂移**：对话一长，项目约定被忘掉，Brownfield 代码里的设计模式被拆掉。
-* 💣 **危险 Bash**：卡住时可能 force push、`--no-verify` 绕过 git hook，或删除关键文件。
+* 🚫 **篡改配置**——遇到编译/lint 错误时去改 `tsconfig.json`、`biome.json`、`.eslintrc`，而不是修真正的 bug。
+* 💣 **危险操作**——force push、`--no-verify` 绕过 git hook、删关键文件、往代码里塞 `eval()`、把密钥文件读进上下文。
+* 🌀 **架构漂移**——上下文增长（又被压缩掉）之后，项目约定被忘光。
+* 📖 **注入指令**——抓来的网页、README、搜索结果里藏着 `ignore previous instructions` / `curl | sh`，Agent 照做。
 
-**散文式提示（`CLAUDE.md`、系统指令）只是软约束。`agent-governor` 提供零方差、确定性的硬拦截。**
+**散文式提示（`CLAUDE.md`、系统指令）只是软约束。Agent Governor 是确定性的硬拦截：同样的输入，永远同样的决定。**
+
+---
+
+## ✨ 和其他护栏的差异
+
+| 能力 | Agent Governor | 常见护栏 |
+| --- | --- | --- |
+| Bash 命令分析 | ✅ argv 级解析 + 能力标签 | shell 字符串匹配 |
+| 源码检查 | ✅ **真语法树**（Babel / Python `ast` / tree-sitter）| 常为正则或没有 |
+| **读取侧注入扫描** | ✅ **Agent 读到什么也检查** | ❌ 只管写入侧 |
+| 压缩后规则重注入 | ✅ SessionStart / PreCompact 钩子 | ❌ 规则跟着上下文一起被压掉 |
+| 团队策略漂移检测 | ✅ `governor status` 对比提交基线 | ❌ |
+| 自审计（脱敏） | ✅ `.agent-governor/audit.log` | 各不相同 |
+
+### 护栏检查项
+
+* 🛡️ **零信任配置盾**——锁定 JS、Python、Rust、Go、Flutter、iOS、Android 生态的工具链清单（`tsconfig.json`、`package.json`、锁文件、`Cargo.toml`、`go.mod`、`pubspec.yaml`、`Podfile`、Gradle、`AndroidManifest.xml` 等）。
+* 🧬 **语法树级源码策略**——JS/TS 用 Babel AST；Python 用标准库 `ast`（接得住别名调用、属性调用、计算属性查找，不只是搜 `eval(`）；Rust/Go/Kotlin/Swift/C/C++/Dart 用 tree-sitter 结构检查。字符串和注释在语法树上不是语句，**天然零误报**。
+* 💣 **Bash 能力分析**——把命令解析成程序 + argv，打上能力标签（`git.push.force`、`hooks.bypass`、`secret.path.read`、`ci.path.write`），命令包在 `sh -c` 里、写入走 `tee` / `sed -i` / 重定向，一样拦得住。
+* 📖 **读取侧注入扫描（业界首创）**——PostToolUse 检查 Agent *读到*的内容：抓取的网页、文件、搜索结果。检测指令覆盖、角色劫持、`curl | sh`、env/密钥外传、零宽字符隐写。加权评分；`injectionPatterns` 支持自定义检测器。
+* 🔄 **SessionStart / PreCompact 规则重注入**——上下文被清空或压缩后，governor 重新注入当前生效的规则和 Agent 被拦过的次数。架构漂移死在它出生的地方。
+* 🎒 **预设规则包与 Rulebook**——`--preset security-hard|frontend|python|strict` 一键拿到有主见的基线；rulebook 是只加不减的策略包（官方随附 terraform / aws / k8s）。
+* 📊 **`governor report`**——审计摘要：总拦截、拦截率、Top 触发规则、最近一次拦截。`--json` 给机器。
+* 🩺 **`governor doctor` 与 `governor status`**——自检一切（运行时、配置、Hook、实弹拦截演练），检测本地策略相对提交基线的削弱。都可以接进 CI。
+* 🪟 **Windows 可用**——分发器是 Node；Bash / Python 运行时可选。
 
 ---
 
 ## 🏗️ 工作原理
 
-`agent-governor` 挂接 Claude Code 原生 Hook 运行时（`PreToolUse`、`PostToolUse`）。通过 **Exit Code 2** 反馈环阻断不安全操作，并把 AST/安全错误精确写回 LLM 上下文。
+Agent Governor 挂接各宿主的原生 Hook 运行时（Claude Code 的 `PreToolUse`/`PostToolUse`/`SessionStart`/`PreCompact`；Codex CLI 与 Gemini CLI 的对应事件）。载荷自动识别、归一化，决定按宿主原生协议输出。
 
 ```
-┌─────────────────┐       Tool Request        ┌───────────────────────┐
-│                 │ ──── (Edit/Write/Bash) ─► │                       │
-│   Claude Code   │                           │     Agent Governor    │
-│     Agent       │ ◄─── Exit 2 (Blocked) ─── │    Security Engine    │
-│                 │      + Error Reason       └───────────┬───────────┘
-└─────────────────┘                                       │
-          ▲                                               │
-          │                                      ┌────────┴─────────┐
-          │                                      │ Guardrail Checks │
-          │                                      ├──────────────────┤
-          │                                      │ 1. Anti-Tamper   │
-          │                                      │ 2. AST Integrity │
-          │                                      │ 3. Bash Safety   │
-          └────── Exit 0 (Approved) ─────────────┤ 4. SOP Verifier  │
-                                                 └──────────────────┘
+┌─────────────────┐      Tool Request       ┌──────────────────────────┐
+│                 │ ── (Edit/Write/Bash) ─► │  Agent Governor          │
+│  Coding Agent   │                         │                          │
+│ (CC/Codex/      │ ◄── block + reason ──── │  1. 配置盾               │
+│  Gemini)        │                         │  2. Bash 能力分析        │
+│                 │ ── (Read/WebFetch) ───► │  3. 语法树源码策略       │
+│                 │      注入扫描           │  4. 注入扫描器           │
+└─────────────────┘                         └────────────┬─────────────┘
+                                                         │
+                                              audit.log（脱敏+哈希）
 ```
 
-### Hook 协议
+宿主支持与协议细节：[docs/hosts.md](./docs/hosts.md)。
 
-| 结果 | 退出码 | 通道 | 效果 |
-| --- | --- | --- | --- |
-| 放行 | `0` | stdout（可选） | 工具调用继续 |
-| 阻断 | `2` | stderr | Claude Code 把原因喂给 Agent 并强制重试 |
-| 内部错误 | `0` | stderr | 失败开放，避免治理进程把 Agent 卡死 |
-
-Claude Code 通过 stdin 以 JSON 传入事件（`tool_name`、`tool_input`、`cwd` 等）。
-
----
-
-## ✨ 特性
-
-* 🛡️ **零信任配置盾**：覆盖 JS / Python / Rust / Go / Flutter / iOS / Android 的清单文件。
-* ⚡ **单一调度器**：默认只挂一条 Pre + 一条 Post Hook，按文件扩展名分发检查。
-* 🧠 **`astRules` 真正生效**：JSON 里的开关会驱动拦截，而不是写着好看。
-* 📖 **读取侧注入扫描（业界首创）**：PostToolUse 检查 agent *读到*的内容——抓取的网页、文件、搜索结果——在它照做之前拦下「ignore previous instructions」「curl \| sh」、密钥外传等 payload。别家只管写入侧，没人管输入侧。
-* 🔄 **SessionStart / PreCompact 规则重注入**：上下文压缩后治理提示自动重建——agent 恰好在记忆被清空的时刻也没法「忘记」护栏。
-* 🎒 **预设规则包**：`--preset security-hard\|frontend\|python\|strict`，一个旗标拿到有主见的基线（`.env`、Dockerfile、CI workflow、锁文件、打包器配置）。
-* 📊 **`governor report`**：把审计日志聚合成摘要——总拦截数、Top 触发规则、最近一次拦截。贴 README、开复盘会都好用。
-* 🪟 **默认 Windows 可用**：主路径是 Node；Bash / Python 运行时是可选的。
-* 📎 **Cursor 软适配**：`init` 会写入 `.cursor/rules/agent-governor.mdc`（Cursor 没有 PreToolUse）。
-
-### 语言覆盖
-
-| 语言 | 配置盾 | 源码策略 | 引擎 |
-| --- | --- | --- | --- |
-| JS / TS | `package.json`、`tsconfig.json` | `eval` / `new Function()` | Babel AST |
-| Python | `pyproject.toml` 等 | `eval`/`exec`、废弃导入 | Node 快路径；`--lang python` 用标准库 `ast` |
-| Rust | `Cargo.toml` | `unsafe {`（默认开） | 正则 |
-| Go | `go.mod` | `panic(`（**默认关**） | 正则 |
-| Dart / Flutter | `pubspec.yaml` | `dart:mirrors` | 正则 |
-| Swift / iOS | `Podfile`、`Package.swift` | `try!` / `as!` | 正则 |
-| Kotlin / Android | Gradle / Manifest | `!!` / `TODO()` | 正则 |
-| Java | Gradle | `Runtime.exec()` | 正则 |
-| C / C++ | CMake / Makefile | `gets()` / `system()` | 正则 |
-
-### IDE
-
-| 工具 | 强制力 | `init` 做什么 |
+| 宿主 | 事件 | 决定通道 |
 | --- | --- | --- |
-| Claude Code | 硬拦截，exit 2 | 写 dispatcher Hook |
-| Cursor | 软约束 | 写 `.cursor/rules/agent-governor.mdc` |
-| OpenCode | 无内置 Hook | 自行把 JSON 管道接到 `npx agent-governor hook` |
+| **Claude Code** | PreToolUse, PostToolUse, SessionStart, PreCompact | exit `2` + stderr 原因 |
+| **OpenAI Codex CLI** | PreToolUse, PostToolUse, SessionStart, PreCompact | stdout JSON `decision: "block"` + `permissionDecision` |
+| **Google Gemini CLI** | BeforeTool, AfterTool, SessionStart, PreCompress | stdout JSON `{ decision: "deny" }` |
+
+内部错误 fail-open（governor 崩了不能卡死 Agent 循环），策略违规 fail-closed。诚实边界：护栏拦的是*意外事故*，不是蓄意对抗——对抗场景请叠加 OS 级沙箱（见 [SECURITY.md](./SECURITY.md)）。
 
 ---
 
 ## 📦 快速开始
 
-```bash
-npm install -D agent-governor
-npx agent-governor init                 # 一条 dispatcher，覆盖全部语言
-npx agent-governor init --lang python   # 可选：只用标准库 ast
-```
-
-默认 Hook：
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
-        "hooks": [{ "type": "command", "command": "npx agent-governor pre-check" }]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-        "hooks": [{ "type": "command", "command": "npx agent-governor post-check" }]
-      }
-    ]
-  }
-}
-```
-
-也可以只用 `npx agent-governor hook`（读取 `hook_event_name`）。
-
-`--lang python` 仍安装零依赖的 `python3 .agent-governor/python/*.py`。`native/governor_guard.sh` 目前仍调用 `python3`；若 PATH 中没有 python3，native hook **fail-closed**（stderr 报错并 exit 2），不再静默放行。决策见 [ADR 0001](./docs/adr/0001-native-runtime.md)。
-
----
-
-## ⚙️ 配置
-
-所有运行时共享仓库根目录的 `governor.config.json`：
-
-```json
-{
-  "protectedFiles": [
-    "tsconfig.json",
-    "package.json",
-    "pyproject.toml",
-    "Cargo.toml",
-    "go.mod",
-    "pubspec.yaml"
-  ],
-  "protectedDirectories": [".claude/", ".agent-governor/"],
-  "forbiddenBashPatterns": [
-    "git commit.*--no-verify",
-    "pip install --insecure",
-    "cargo publish --no-verify"
-  ]
-}
-```
-
-可复制 [`governor.config.example.json`](./governor.config.example.json)。
-
-默认是**并集**：你写的 `protectedFiles` 会加到内置名单上，不能靠省略来拿掉 `tsconfig.json`。
-
-| 字段 | 语义 |
-| --- | --- |
-| `protectedFiles`（无开关） | 与默认并集 |
-| `unprotect` | 从合并后的名单里减去，例如 `["tsconfig.json"]` 之后该文件可写 |
-| `override: true` | 完全替换默认名单，只用你提供的数组 |
-
-`unprotect` 是只减不增；`override` 是丢掉默认。
-
-```json
-{
-  "unprotect": ["tsconfig.json"]
-}
-```
-
----
-
-## 📊 性能
-
-| 检查类型 | 运行时 | 耗时 |
-| --- | --- | --- |
-| 配置盾（PreToolUse） | Node / Python / Bash | < 8–15ms |
-| JS/TS AST | `@babel/parser` | < 28ms（约 1000 LOC） |
-| Python AST | 标准库 `ast` | < 10ms |
-| Rust `unsafe` / Go `panic` | Bash + 正则 | < 15ms |
-
----
-
-## 🧪 CLI
-
-```bash
-npx agent-governor init
-npx agent-governor hook
-npx agent-governor pre-check
-npx agent-governor post-check
-npx agent-governor session-hook --event SessionStart   # 规则重注入（init 自动接线）
-npx agent-governor doctor                              # 自检：运行时、配置、Hook、审计状态
-npx agent-governor status                              # 当前策略 + 本地与提交基线的漂移
-npx agent-governor explain "git reset --hard"          # 这条命令为什么会被拦？
-npx agent-governor explain path/to/tsconfig.json
-npx agent-governor report                              # 审计摘要：拦截数、Top 规则、最近一次拦截
-npx agent-governor report --json
-npx agent-governor rule list                           # 已安装的规则包
-npx agent-governor rule add terraform aws              # 启用叠加式规则包
-npx agent-governor version
-```
-
-### 作为 Claude Code 插件安装
-
-无需 `init`——插件自动接好全部 Hook：
+**方式 A——Claude Code 插件（零配置）：**
 
 ```bash
 # 在 Claude Code 里：
@@ -227,15 +97,73 @@ npx agent-governor version
 /plugin install agent-governor@agent-governor
 ```
 
-或者继续用 npm 流程：`npm install -D agent-governor && npx agent-governor init`。
+**方式 B——npm：**
+
+```bash
+npm install -D agent-governor
+npx agent-governor init
+```
+
+`init` 会写入每个事件一条的分发 Hook（覆盖 JS/TS、Python、Rust、Go、Dart、Swift、Kotlin、Java、C/C++），外加读取扫描与会话重注入 Hook，生成 `governor.config.json`，并给 Cursor 写 `.cursor/rules/agent-governor.mdc` 软适配。生成的 Claude Code Hook：
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash", "hooks": [{ "type": "command", "command": "npx agent-governor pre-check" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write|MultiEdit|NotebookEdit", "hooks": [{ "type": "command", "command": "npx agent-governor post-check" }] },
+      { "matcher": "Read|WebFetch|WebSearch", "hooks": [{ "type": "command", "command": "npx agent-governor post-check" }] }
+    ],
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "npx agent-governor session-hook --event SessionStart" }] }
+    ],
+    "PreCompact": [
+      { "hooks": [{ "type": "command", "command": "npx agent-governor session-hook --event PreCompact" }] }
+    ]
+  }
+}
+```
+
+**3. 验证拦截真的生效：**
+
+```bash
+npx agent-governor test --command "git push --force origin main"
+# → decision: deny  (ruleId: git.push.force)
+
+npx agent-governor doctor
+# → all checks passed（运行时、配置、Hook、审计、实弹拦截演练）
+```
+
+**Codex CLI / Gemini CLI 配置：** 见 [docs/hosts.md](./docs/hosts.md)——适配器 Hook 配置随 npm 包分发（`adapters/` 目录）。
+
+---
+
+## 🧪 CLI
+
+```bash
+npx agent-governor init [--lang auto|all|node|python|native] [--preset <name>]
+npx agent-governor hook                  # 自动 Pre/Post 分发（读 hook_event_name）
+npx agent-governor pre-check             # PreToolUse 护栏（stdin JSON）
+npx agent-governor post-check            # PostToolUse 源码 + 注入护栏（stdin JSON）
+npx agent-governor session-hook --event SessionStart|PreCompact
+npx agent-governor test --command "git push --force" [--json]
+npx agent-governor test --file tsconfig.json [--operation modify|write] [--json]
+npx agent-governor explain "git reset --hard"   # 这条命令会怎样、为什么
+npx agent-governor explain path/to/tsconfig.json
+npx agent-governor explain --config governor.config.json   # 输出编译后的规则
+npx agent-governor doctor                # 自检（失败 exit 1）
+npx agent-governor status                # 当前策略 + 与提交基线的漂移（漂移 exit 1）
+npx agent-governor report [--json]       # 审计摘要
+npx agent-governor rule list | rule add <name...>   # 叠加式规则包
+npx agent-governor version
+```
 
 ### 预设规则包
 
-一个旗标拿到有主见的基线，可组合、可独立用：
-
 ```bash
 npx agent-governor explain --preset security-hard   # 预览会多保护哪些文件
-GOVERNOR_PRESET=security-hard npx agent-governor test --command "npm install --force"
 ```
 
 | 预设 | 在默认盾之上新增 |
@@ -245,53 +173,92 @@ GOVERNOR_PRESET=security-hard npx agent-governor test --command "npm install --f
 | `python` | `poetry.lock`、`pdm.lock`、`uv.lock`、`tox.ini`、`conda.yaml` |
 | `strict` | 以上全部 + `goForbidPanic`、`requireErrorBoundary` |
 
-也可以写进 `governor.config.json`（文件里的值优先于环境变量 / 旗标）：
+写进 `governor.config.json` 持久化（`"preset": "security-hard"`，文件里的值优先于环境变量/旗标）。
+
+---
+
+## ⚙️ 配置（`governor.config.json`）
 
 ```json
 {
-  "preset": "security-hard"
+  "preset": "security-hard",
+  "engine": "ast-grep",
+  "protectedFiles": ["tsconfig.json", "package.json", "my.config.json"],
+  "protectedDirectories": [".claude/", ".agent-governor/"],
+  "forbiddenBashPatterns": ["terraform\\s+destroy"],
+  "unprotect": ["tsconfig.json"],
+  "injectionMode": "scan",
+  "injectionPatterns": [
+    { "id": "custom.publish-bait", "weight": 3, "pattern": "run\\s+npm\\s+publish" }
+  ],
+  "astRules": {
+    "noDirectEval": true,
+    "noNewFunction": true,
+    "pythonForbiddenCalls": ["eval", "exec"],
+    "rustForbidUnsafe": true,
+    "goForbidPanic": false,
+    "swiftForbidForceTry": true,
+    "kotlinForbidBangBang": true,
+    "cppForbidUnsafeC": true,
+    "javaForbidRuntimeExec": true
+  }
 }
 ```
 
-### 读取侧注入扫描
+### 源码检查引擎
 
-别家护栏只看 agent **写**什么。Agent Governor 还看它**读**什么：
+| 引擎 | 语言 | 说明 |
+| --- | --- | --- |
+| **Babel AST**（默认） | JS/TS | 结构化识别 `eval` / `new Function` / 自定义禁用调用 |
+| **Python 标准库 `ast`**（默认） | Python | 别名、属性与计算属性查找；语法错误片段降级正则兜底 |
+| **tree-sitter via ast-grep**（可选） | Rust, Go, Kotlin, Swift, C, C++, Dart | 字符串/注释结构性免疫误报；需要 `@ast-grep/lang-*` 包（随包 optionalDependencies，预编译） |
+| **正则 SOP**（默认兜底） | 以上全部 | 零依赖启发式；非代码文本有少量误报风险 |
 
-- PostToolUse 挂在 `Read` / `WebFetch` / `WebSearch` 上，扫描进入上下文的内容。
-- 检测器：指令覆盖（`ignore previous instructions`）、角色劫持、`curl \| sh` payload、env / 密钥外传、零宽字符隐写。
-- 评分 ≥ 2 拦截并把原因回传给 agent；`injectionMode: "off"` 关闭；`injectionPatterns` 支持自定义正则检测器。
+`"engine": "ast-grep"` 即可启用；语言包缺失时该语言自动降级回正则 SOP。
 
-### 规则包（Rulebooks）：只加不减
+### 字段语义
 
-除内置预设外，还可安装**规则包**——社区策略包，只能*增加*保护，不能减少（规则包碰不到 `unprotect`、`override`，也关不掉注入扫描）：
+| 字段 | 含义 |
+| --- | --- |
+| `protectedFiles`（无旗标） | 与默认并集——你的条目加进去，默认保留 |
+| `unprotect` | 从合并后的名单里减去（`["tsconfig.json"]` 让它可写） |
+| `override: true` | 完全用你的列表替换默认 |
+| `injectionMode` | `"scan"`（默认）或 `"off"` |
+| `injectionPatterns` | 自定义注入检测器：`[{ id, weight, pattern }]` |
+| `preset` | `security-hard` / `frontend` / `python` / `strict`（优先于 env/旗标） |
+| `rulebooks` | 叠加式规则包名，如 `["terraform", "aws"]` |
+| `failureMode` | `open`（默认）/ `closed` |
 
-```bash
-npx agent-governor rule add terraform aws k8s   # 在 governor.config.json 里激活
-npx agent-governor rule list
-```
+从 [`governor.config.example.json`](./governor.config.example.json) 起步。`governor.config.cjs/.js/.mjs` 覆盖层也支持。
 
-官方包在 [`rulebooks/`](./rulebooks)：`terraform`（state/lock/清单 + `apply -auto-approve`、`destroy`）、`aws`（IAM/EC2/CloudFormation 破坏性操作）、`k8s`（删命名空间、`helm uninstall`、force apply）。自己写一个 JSON 放到 `.agent-governor/rulebooks/` 即可。
+---
 
-### 团队策略共享与漂移检测
+## 📊 性能
 
-把 `governor.config.json` 提交进仓库。`governor status` 会把工作区副本和已提交基线对比，标出每一处本地削弱——被移除的保护文件、被删的 Bash 模式、被关的 AST 开关、被关的注入扫描——让策略漂移在 code review 里现形，而不是在事故里：
+| 检查类型 | 运行时 | 耗时 |
+| --- | --- | --- |
+| 配置盾（PreToolUse） | Node 分发器 | < 8ms |
+| JS/TS AST | Babel | < 28ms（1000 行） |
+| Python 标准库 `ast` | `python3` | ~50ms（进程启动为主；解析仅 0.02ms） |
+| Rust/Go/Kotlin/Swift/C/C++/Dart | ast-grep（tree-sitter） | < 7ms（500 行） |
+| 正则 SOP（兜底） | Node | < 5ms |
 
-```bash
-npx agent-governor status   # 本地策略弱于提交基线时 exit 1
-```
-
-接进 CI，PR 就没法悄悄放松保护：
-
-```yaml
-- run: npx agent-governor doctor   # Hook 装了吗？配置合法吗？拦截有效吗？
-- run: npx agent-governor status   # 策略被削弱了吗？
-```
+`npm run build` 产出 `dist/*.js` 打包。
 
 ---
 
 ## 🤝 贡献
 
 欢迎贡献，请先阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+
+1. Fork 仓库
+2. 建特性分支（`git checkout -b feat/amazing-rule`）
+3. 提交改动
+4. 推送并开 Pull Request
+
+安全问题请走 [GitHub Security Advisories](https://github.com/lihenair/agent-governor/security/advisories/new)，不要开公开 issue。威胁模型见 [SECURITY.md](./SECURITY.md)。
+
+---
 
 ## 📜 许可证
 

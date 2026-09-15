@@ -4,272 +4,92 @@
 
 **Deterministic Runtime Guardrails for Claude Code, Codex CLI & Gemini CLI**
 
-*Syntax-tree-level code checks (tree-sitter), read-side injection scanning, and hardware-grade hooks.*
-
-*Stop prompt injection, architecture drift, and configuration tampering with hardware-grade hooks.*
-
-One config, three coding agents. See [docs/hosts.md](./docs/hosts.md).
+*Syntax-tree code checks, read-side prompt-injection scanning, and hardware-grade hooks — one config, three coding agents.*
 
 [English](./README.md) | [简体中文](./README_ZH.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Claude Code Support](https://img.shields.io/badge/Claude%20Code-v1.0%2B-brightgreen.svg)](#)
+[![CI](https://github.com/lihenair/agent-governor/actions/workflows/ci.yml/badge.svg)](https://github.com/lihenair/agent-governor/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/agent-governor.svg)](https://www.npmjs.com/package/agent-governor)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/lihenair/agent-governor/pulls)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-green.svg)](#)
-[![Python](https://img.shields.io/badge/Python-3.9%2B%20zero--dep-3776AB.svg)](#)
-[![Rust / Go / C++](https://img.shields.io/badge/Rust%20%7C%20Go%20%7C%20C%2B%2B-native-orange.svg)](#)
-[![Flutter / Mobile](https://img.shields.io/badge/Flutter%20%7C%20iOS%20%7C%20Android-polyglot-blue.svg)](#)
 
 </div>
 
 <br />
 
-<div align="center">
-  <img src="docs/demo.svg" alt="Agent Governor Demo" width="800px" />
-  <p><em>Left: Without Guard (Agent modifies tsconfig.json to bypass TS errors).<br/>Right: With Agent Governor (PreToolUse Hook intercepts and forces Agent to fix TypeScript code).</em></p>
-</div>
-
 ---
 
 ## ⚡ The Problem
 
-Modern AI agents (Claude Code, Cursor, OpenCode) are incredibly fast, but they suffer from **non-determinism and context drift**:
+AI coding agents are incredibly fast, but they suffer from **non-determinism and context drift**:
 
-* 🚫 **Configuration Tampering**: Agents often edit `tsconfig.json`, `biome.json`, or `.eslintrc` to "fix" compilation or linting errors instead of resolving the actual bugs.
-* 🌀 **Architecture Drift**: As conversation contexts grow, agents forget project rules, breaking design patterns in Brownfield codebases.
-* 💣 **Dangerous Bash Operations**: Agents might run force pushes, bypass git hooks (`--no-verify`), or delete critical files when struggling with errors.
+* 🚫 **Configuration Tampering** — agents edit `tsconfig.json`, `biome.json`, or `.eslintrc` to "fix" errors instead of fixing the actual bugs.
+* 💣 **Dangerous Operations** — force pushes, `--no-verify` hook bypasses, deleted files, `eval()` in shipped code, secret paths read into context.
+* 🌀 **Architecture Drift** — as context grows (and gets compacted away), agents forget project rules.
+* 📖 **Injected Instructions** — fetched web pages, READMEs, and search results can carry `ignore previous instructions` / `curl | sh` payloads that the agent obeys.
 
-**Prose prompts (like `CLAUDE.md` or system instructions) are soft guidelines. `agent-governor` provides deterministic, zero-variance hardware-grade enforcement.**
-
----
-
-## 🏗️ How It Works (Architecture)
-
-`agent-governor` taps directly into Claude Code's native Hook runtime (`PreToolUse`, `PostToolUse`). It uses **Exit Code 2** feedback loops to block unsafe operations and inject actionable AST/security errors back into the LLM's context.
-
-```
-┌─────────────────┐       Tool Request        ┌───────────────────────┐
-│                 │ ──── (Edit/Write/Bash) ─► │                       │
-│   Claude Code   │                           │     Agent Governor    │
-│     Agent       │ ◄─── Exit 2 (Blocked) ─── │    Security Engine    │
-│                 │      + Error Reason       └───────────┬───────────┘
-└─────────────────┘                                       │
-          ▲                                               │
-          │                                      ┌────────┴─────────┐
-          │                                      │ Guardrail Checks │
-          │                                      ├──────────────────┤
-          │                                      │ 1. Anti-Tamper   │
-          │                                      │ 2. AST Integrity │
-          │                                      │ 3. Bash Safety   │
-          └────── Exit 0 (Approved) ─────────────┤ 4. SOP Verifier  │
-                                                 └──────────────────┘
-```
-
-### Hook protocol
-
-| Result | Exit code | Channel | Effect |
-| --- | --- | --- | --- |
-| Allow | `0` | stdout (optional) | Tool call proceeds |
-| Block | `2` | stderr | Claude Code feeds the reason back to the agent and forces a retry |
-| Internal error | `0` | stderr | Fail-open so a governor crash cannot freeze the agent loop |
-
-Claude Code sends each event as JSON on stdin (`tool_name`, `tool_input`, `cwd`, ...).
+**Prose prompts (`CLAUDE.md`, system instructions) are soft guidelines. Agent Governor is deterministic, zero-variance enforcement: same input, same decision, every time.**
 
 ---
 
-## ✨ Key Features
+## ✨ What Makes It Different
 
-* 🛡️ **Zero-Trust Config Shield**: Locks toolchain manifests across JS, Python, Rust, Go, Flutter, iOS, and Android.
-* ⚡ **Single dispatcher**: one PreToolUse + one PostToolUse hook. File extension picks the inspector (no triple-hook lag).
-* 🧠 **Polyglot source policy** driven by `governor.config.json` `astRules` (flags are real, not docs-only).
-* 📖 **Read-side injection scanning (industry first)**: PostToolUse guard inspects what agents *read* — fetched web pages, files, search results — and blocks `ignore previous instructions`, `curl | sh`, and secret-exfiltration payloads before the agent obeys them. Nobody else checks the input side.
-* 🔄 **Rule re-injection on SessionStart / PreCompact**: governance context survives context compaction — the agent cannot "forget" the guardrails exactly when its memory gets wiped.
-* 🎒 **Preset policy packs**: `--preset security-hard|frontend|python|strict` — one flag for an opinionated baseline (`.env`, Dockerfile, CI workflows, lockfiles, bundler configs).
-* 📊 **`governor report`**: turns the audit log into a digest — total blocks, top triggered rules, last intervention. Perfect for your README and retro meetings.
-* 🪟 **Windows-safe default**: the dispatcher is Node. Bash/Python runtimes stay optional.
-* 📎 **Cursor soft adapter**: `init` writes `.cursor/rules/agent-governor.mdc` because Cursor has no PreToolUse hooks.
-
-### Language coverage
-
-| Language | Config shield | Source policy (dispatcher) | Engine |
-| --- | --- | --- | --- |
-| JavaScript / TypeScript | `package.json`, `tsconfig.json`, lockfiles, eslint/biome | `eval`, `new Function()`, custom forbidden calls | Babel AST |
-| Python | `pyproject.toml`, `requirements.txt`, `setup.py`, Pipfile | `eval`/`exec` (incl. aliases, attribute & computed lookups), `imp`/`optparse` | stdlib `ast` (true syntax tree, zero deps) with regex fallback for partial snippets |
-| Rust | `Cargo.toml`, `Cargo.lock` | `unsafe {` blocks (`rustForbidUnsafe`, default on) | tree-sitter (ast-grep) or regex SOP |
-| Go | `go.mod`, `go.sum` | `panic(` calls (`goForbidPanic`, **default off**) | tree-sitter (ast-grep) or regex SOP |
-| Dart / Flutter | `pubspec.yaml` | `dart:mirrors` imports | tree-sitter (ast-grep) or regex SOP |
-| Swift / iOS | `Podfile`, `Package.swift` | `try!` (structural `try_operator`) | tree-sitter (ast-grep) or regex SOP |
-| Kotlin / Android | `build.gradle(.kts)`, `settings.gradle`, `AndroidManifest.xml` | `!!` force unwrap (structural postfix) | tree-sitter (ast-grep) or regex SOP |
-| Java | Gradle / manifest | `Runtime.getRuntime().exec()` | Regex SOP |
-| C / C++ | `CMakeLists.txt`, `Makefile` | `gets()`, `system()` calls | tree-sitter (ast-grep) or regex SOP |
-
-> **Why syntax trees beat regex for code checks:** line-regex cannot tell
-> `unsafe { x() }` (real code) from `"never write unsafe { }"` (a string
-> literal) — it flags both. Tree-sitter grammars know strings and comments are
-> not statements, so structural rules have **zero false positives** on
-> non-code text. Enable with `"engine": "ast-grep"` in `governor.config.json`
-> (auto-detects installed `@ast-grep/lang-*` packs; graceful regex fallback
-> when missing).
-
-### IDE / agent support
-
-| Tool | Enforcement | What `init` does |
+| Capability | Agent Governor | Typical guardrails |
 | --- | --- | --- |
-| **Claude Code** | Hard. `PreToolUse` / `PostToolUse`, exit 2 | Writes `.claude/settings.json` dispatcher hooks |
-| **Cursor** | Soft. No tool hooks | Writes `.cursor/rules/agent-governor.mdc` |
-| **OpenCode** | None built-in | Use Claude Code, or pipe tool JSON through `npx agent-governor hook` in your own wrapper |
+| Bash command analysis | ✅ argv-level + capability tags | shell string matching |
+| Source code checks | ✅ **true syntax trees** (Babel / Python `ast` / tree-sitter) | often regex or absent |
+| **Read-side injection scanning** | ✅ **what the agent reads is scanned too** | ❌ write-side only |
+| Rule re-injection after compaction | ✅ SessionStart / PreCompact hooks | ❌ rules get compacted away |
+| Team policy drift detection | ✅ `governor status` vs committed baseline | ❌ |
+| Self-audit with redaction | ✅ `.agent-governor/audit.log` | varies |
+
+### Guardrail checks
+
+* 🛡️ **Zero-Trust Config Shield** — locks toolchain manifests across JS, Python, Rust, Go, Flutter, iOS, Android ecosystems (`tsconfig.json`, `package.json`, lockfiles, `Cargo.toml`, `go.mod`, `pubspec.yaml`, `Podfile`, Gradle, `AndroidManifest.xml`, ...).
+* 🧬 **Syntax-tree source policy** — Babel AST for JS/TS, Python's stdlib `ast` (catches aliased calls, attribute calls, computed lookups — not just `eval(`), tree-sitter structural checks for Rust/Go/Kotlin/Swift/C/C++/Dart. Strings and comments are structurally immune to false positives.
+* 💣 **Bash capability analysis** — parses commands into program + argv, tags capabilities (`git.push.force`, `hooks.bypass`, `secret.path.read`, `ci.path.write`), and catches the same violation even when the command is wrapped in `sh -c` or a write lands via `tee` / `sed -i` / redirection.
+* 📖 **Read-side injection scanning (industry first)** — PostToolUse guard inspects what the agent *reads*: fetched pages, files, search results. Detects instruction override, role hijack, `curl | sh`, env/secret exfiltration, hidden zero-width Unicode. Weighted scoring; custom detectors via `injectionPatterns`.
+* 🔄 **Rule re-injection on SessionStart / PreCompact** — after a context wipe or compaction, the governor re-injects which rules are active and how many times the agent has been blocked. Architecture drift dies where it's born.
+* 🎒 **Preset policy packs & rulebooks** — `--preset security-hard|frontend|python|strict`, plus additive-only rulebooks (terraform / aws / k8s ship officially) that can never weaken your policy.
+* 📊 **`governor report`** — audit digest: total blocks, block rate, top triggered rules, last intervention. `--json` for machines.
+* 🩺 **`governor doctor` & `governor status`** — self-check everything (runtime, config, hooks, live deny dry-run) and detect local policy drift vs the committed baseline. Wire both into CI.
+* 🪟 **Windows-safe** — dispatcher is Node; Bash/Python runtimes optional.
+
+---
+
+## 🏗️ How It Works
+
+Agent Governor taps each host's native hook runtime (Claude Code `PreToolUse`/`PostToolUse`/`SessionStart`/`PreCompact`; Codex CLI and Gemini CLI equivalents). Payloads are auto-detected and normalized; decisions are emitted in the host's native contract.
+
+```
+┌─────────────────┐      Tool Request       ┌──────────────────────────┐
+│                 │ ── (Edit/Write/Bash) ─► │  Agent Governor          │
+│  Coding Agent   │                         │                          │
+│ (CC/Codex/      │ ◄── block + reason ──── │  1. Config shield        │
+│  Gemini)        │                         │  2. Bash capabilities    │
+│                 │ ── (Read/WebFetch) ───► │  3. Syntax-tree policy   │
+│                 │      injection scan     │  4. Injection scanner    │
+└─────────────────┘                         └────────────┬─────────────┘
+                                                         │
+                                              audit.log (redacted, hashed)
+```
+
+Host support and protocol details: [docs/hosts.md](./docs/hosts.md).
+
+| Host | Events | Decision channel |
+| --- | --- | --- |
+| **Claude Code** | PreToolUse, PostToolUse, SessionStart, PreCompact | exit `2` + stderr reason |
+| **OpenAI Codex CLI** | PreToolUse, PostToolUse, SessionStart, PreCompact | stdout JSON `decision: "block"` + `permissionDecision` |
+| **Google Gemini CLI** | BeforeTool, AfterTool, SessionStart, PreCompress | stdout JSON `{ decision: "deny" }` |
+
+Fail-open on internal errors (a governor bug must not freeze the agent loop), fail-closed on policy violations. Honest scope: guardrails stop *accidental* damage, not a determined adversary — for that, add OS-level sandboxing (see [SECURITY.md](./SECURITY.md)).
 
 ---
 
 ## 📦 Quick Start
 
-### 1. Install via Package Manager
-
-```bash
-npm install -D agent-governor
-# or
-pnpm add -D agent-governor
-```
-
-### 2. Initialize in Your Project
-
-Run the setup wizard to automatically configure `.claude/settings.json`:
-
-```bash
-npx agent-governor init              # one dispatcher hook, all languages
-npx agent-governor init --lang python  # optional: stdlib ast only, no Babel
-```
-
-Default hooks (covers JS/TS, Python, Rust, Go, Dart, Swift, Kotlin, Java, C/C++):
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
-        "hooks": [{ "type": "command", "command": "npx agent-governor pre-check" }]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-        "hooks": [{ "type": "command", "command": "npx agent-governor post-check" }]
-      }
-    ]
-  }
-}
-```
-
-Or a single command that reads `hook_event_name`:
-
-```bash
-npx agent-governor hook
-```
-
-`--lang python` still installs zero-dep `python3 .agent-governor/python/*.py` hooks. The Bash native guard remains in the package for air-gapped Unix boxes, but the default path is Node so Windows works without `bash`/`python3`. `native/governor_guard.sh` still shells out to `python3` today; if it is missing the hook **fails closed** (exit 2) instead of silently allowing every tool call. See [ADR 0001](./docs/adr/0001-native-runtime.md).
-
----
-
-## ⚙️ Configuration (`governor.config.json`)
-
-One JSON file is shared by the Node, Python, and native runtimes:
-
-```json
-{
-  "protectedFiles": [
-    "tsconfig.json",
-    "package.json",
-    "pyproject.toml",
-    "requirements.txt",
-    "Cargo.toml",
-    "Cargo.lock",
-    "go.mod",
-    "go.sum",
-    "CMakeLists.txt",
-    "pubspec.yaml",
-    ".eslintrc",
-    "biome.json"
-  ],
-  "protectedDirectories": [".claude/", ".agent-governor/"],
-  "forbiddenBashPatterns": [
-    "git commit.*--no-verify",
-    "rm -rf \\.git",
-    "pip install --insecure",
-    "cargo publish --no-verify"
-  ],
-  "astRules": {
-    "noDirectEval": true,
-    "pythonForbiddenCalls": ["eval", "exec"],
-    "pythonDeprecatedImports": ["imp", "optparse"],
-    "rustForbidUnsafe": true,
-    "goForbidPanic": false,
-    "dartForbidMirrors": true,
-    "swiftForbidForceTry": true,
-    "kotlinForbidBangBang": true,
-    "cppForbidUnsafeC": true,
-    "javaForbidRuntimeExec": true
-  }
-}
-```
-
-List fields **union** with built-in defaults unless you opt out:
-
-| Field | Meaning |
-| --- | --- |
-| `protectedFiles` (no flags) | Union with defaults. User entries are added; defaults stay. |
-| `unprotect` | Subtract names from the merged `protectedFiles` list (`["tsconfig.json"]` makes that file writable). |
-| `override: true` | Replace default lists entirely with whatever you set (`protectedFiles` becomes only your array). |
-
-`unprotect` is “subtract from defaults”. `override` is “ignore defaults”. Do not combine them unless you want both: replace, then subtract.
-
-```json
-{
-  "unprotect": ["tsconfig.json"]
-}
-```
-
-Copy [`governor.config.example.json`](./governor.config.example.json) to get started. `governor.config.cjs` is still accepted as a Node-only overlay.
-
----
-
-## 📊 Benchmark & Performance
-
-`agent-governor` is built with execution speed as a top priority so it does not slow down your AI workflow:
-
-| Check Type | Runtime | Execution Time |
-| --- | --- | --- |
-| Config shield | Node dispatcher | < 8ms |
-| JS/TS AST | Babel | < 28ms (1000 LOC) |
-| Python / Rust / Go / Dart / Swift / Kotlin / Java / C | Node regex SOP | < 5ms |
-| Python stdlib `ast` | `python3` | ~50ms (process start dominates; parse is 0.02ms) |
-
-Run `npm run build` to emit zero-walk `dist/*.js` bundles (parser + traverse inlined).
-
----
-
-## 🧪 CLI
-
-```bash
-npx agent-governor init
-npx agent-governor hook
-npx agent-governor pre-check
-npx agent-governor post-check
-npx agent-governor session-hook --event SessionStart   # rule re-injection (auto-wired by init)
-npx agent-governor doctor                              # self-check: runtime, config, hooks, audit state
-npx agent-governor status                              # active policy + local-vs-committed drift
-npx agent-governor explain "git reset --hard"          # why would this be blocked?
-npx agent-governor explain path/to/tsconfig.json
-npx agent-governor report                              # audit digest: blocks, top rules, last intervention
-npx agent-governor report --json
-npx agent-governor rule list                           # installed rulebooks
-npx agent-governor rule add terraform aws              # activate additive policy packs
-npx agent-governor version
-```
-
-### Install as a Claude Code plugin
-
-No `init` needed — the plugin wires every hook for you:
+**Option A — Claude Code plugin (zero config):**
 
 ```bash
 # inside Claude Code:
@@ -277,15 +97,73 @@ No `init` needed — the plugin wires every hook for you:
 /plugin install agent-governor@agent-governor
 ```
 
-Or keep the npm flow: `npm install -D agent-governor && npx agent-governor init`.
+**Option B — npm:**
 
-### Preset policy packs
+```bash
+npm install -D agent-governor
+npx agent-governor init
+```
 
-One flag, an opinionated baseline — compose presets or use them standalone:
+`init` writes a single dispatcher hook per event (covering JS/TS, Python, Rust, Go, Dart, Swift, Kotlin, Java, C/C++) plus read-scan and session re-injection hooks, generates `governor.config.json`, and adapts Cursor via `.cursor/rules/agent-governor.mdc`. The generated Claude Code hooks:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash", "hooks": [{ "type": "command", "command": "npx agent-governor pre-check" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write|MultiEdit|NotebookEdit", "hooks": [{ "type": "command", "command": "npx agent-governor post-check" }] },
+      { "matcher": "Read|WebFetch|WebSearch", "hooks": [{ "type": "command", "command": "npx agent-governor post-check" }] }
+    ],
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "npx agent-governor session-hook --event SessionStart" }] }
+    ],
+    "PreCompact": [
+      { "hooks": [{ "type": "command", "command": "npx agent-governor session-hook --event PreCompact" }] }
+    ]
+  }
+}
+```
+
+**3. Prove it works:**
+
+```bash
+npx agent-governor test --command "git push --force origin main"
+# → decision: deny  (ruleId: git.push.force)
+
+npx agent-governor doctor
+# → all checks passed (runtime, config, hooks, audit, live deny dry-run)
+```
+
+**Codex CLI / Gemini CLI setup:** see [docs/hosts.md](./docs/hosts.md) — adapter hook configs ship in the npm package (`adapters/`).
+
+---
+
+## 🧪 CLI
+
+```bash
+npx agent-governor init [--lang auto|all|node|python|native] [--preset <name>]
+npx agent-governor hook                  # auto Pre/Post dispatcher (reads hook_event_name)
+npx agent-governor pre-check             # PreToolUse guard (stdin JSON)
+npx agent-governor post-check            # PostToolUse source + injection guard (stdin JSON)
+npx agent-governor session-hook --event SessionStart|PreCompact
+npx agent-governor test --command "git push --force" [--json]
+npx agent-governor test --file tsconfig.json [--operation modify|write] [--json]
+npx agent-governor explain "git reset --hard"   # what would happen, and why
+npx agent-governor explain path/to/tsconfig.json
+npx agent-governor explain --config governor.config.json   # dump compiled rules
+npx agent-governor doctor                # self-check (exit 1 on failure)
+npx agent-governor status                # policy + drift vs committed baseline (exit 1 on drift)
+npx agent-governor report [--json]       # audit digest
+npx agent-governor rule list | rule add <name...>   # additive rulebook packs
+npx agent-governor version
+```
+
+### Presets
 
 ```bash
 npx agent-governor explain --preset security-hard   # preview what gets protected
-GOVERNOR_PRESET=security-hard npx agent-governor test --command "npm install --force"
 ```
 
 | Preset | Adds to the default shield |
@@ -295,65 +173,96 @@ GOVERNOR_PRESET=security-hard npx agent-governor test --command "npm install --f
 | `python` | `poetry.lock`, `pdm.lock`, `uv.lock`, `tox.ini`, `conda.yaml` |
 | `strict` | all of the above + `goForbidPanic`, `requireErrorBoundary` |
 
-Or persist it in `governor.config.json` (file value wins over the env/flag):
+Persist with `"preset": "security-hard"` in `governor.config.json` (file wins over env/flag).
+
+---
+
+## ⚙️ Configuration (`governor.config.json`)
 
 ```json
 {
-  "preset": "security-hard"
+  "preset": "security-hard",
+  "engine": "ast-grep",
+  "protectedFiles": ["tsconfig.json", "package.json", "my.config.json"],
+  "protectedDirectories": [".claude/", ".agent-governor/"],
+  "forbiddenBashPatterns": ["terraform\\s+destroy"],
+  "unprotect": ["tsconfig.json"],
+  "injectionMode": "scan",
+  "injectionPatterns": [
+    { "id": "custom.publish-bait", "weight": 3, "pattern": "run\\s+npm\\s+publish" }
+  ],
+  "astRules": {
+    "noDirectEval": true,
+    "noNewFunction": true,
+    "pythonForbiddenCalls": ["eval", "exec"],
+    "rustForbidUnsafe": true,
+    "goForbidPanic": false,
+    "swiftForbidForceTry": true,
+    "kotlinForbidBangBang": true,
+    "cppForbidUnsafeC": true,
+    "javaForbidRuntimeExec": true
+  }
 }
 ```
 
-### Read-side injection scanning
+### Source-check engines
 
-Every other guardrail watches what the agent **writes**. Agent Governor also watches what it **reads**:
+| Engine | Languages | Notes |
+| --- | --- | --- |
+| **Babel AST** (default) | JS/TS | Structural `eval` / `new Function` / custom calls |
+| **Python stdlib `ast`** (default) | Python | Aliases, attribute & computed lookups; regex fallback for syntax-error fragments |
+| **tree-sitter via ast-grep** (opt-in) | Rust, Go, Kotlin, Swift, C, C++, Dart | Strings/comments structurally immune to false positives; requires `@ast-grep/lang-*` packs (shipped as optionalDependencies, prebuilt) |
+| **Regex SOP** (default fallback) | all of the above | Zero-dependency heuristic; some false-positive risk on non-code text |
 
-- PostToolUse hooks on `Read` / `WebFetch` / `WebSearch` scan incoming content.
-- Detectors: instruction override (`ignore previous instructions`), role hijack, `curl | sh` payloads, env/secret exfiltration, hidden zero-width Unicode smuggling.
-- Score ≥ 2 blocks and feeds the reason back to the agent; `injectionMode: "off"` disables it; `injectionPatterns` accepts your own regex detectors.
+Set `"engine": "ast-grep"` to opt in; missing lang packs gracefully degrade that language to the regex SOP.
 
-### Rulebooks: additive policy packs
+### Field semantics
 
-Beyond built-in presets, install **rulebooks** — community policy packs that can only *add* protection, never subtract (a rulebook cannot touch `unprotect`, `override`, or turn injection scanning off):
+| Field | Meaning |
+| --- | --- |
+| `protectedFiles` (no flags) | Union with defaults — user entries are added, defaults stay |
+| `unprotect` | Subtract names from the merged list (`["tsconfig.json"]` makes it writable) |
+| `override: true` | Replace default lists entirely with yours |
+| `injectionMode` | `"scan"` (default) or `"off"` |
+| `injectionPatterns` | Extra detectors: `[{ id, weight, pattern }]` |
+| `preset` | `security-hard` / `frontend` / `python` / `strict` (wins over env/flag) |
+| `rulebooks` | Additive pack names, e.g. `["terraform", "aws"]` |
+| `failureMode` | `open` (default) / `closed` |
 
-```bash
-npx agent-governor rule add terraform aws k8s   # activate packs in governor.config.json
-npx agent-governor rule list
-```
+Copy [`governor.config.example.json`](./governor.config.example.json) to start. `governor.config.cjs/.js/.mjs` overlays are accepted.
 
-Official packs ship in [`rulebooks/`](./rulebooks): `terraform` (state/lock/manifests + `apply -auto-approve`, `destroy`), `aws` (destructive IAM/EC2/CloudFormation ops), `k8s` (namespace deletion, `helm uninstall`, force apply). Write your own as JSON and drop it in `.agent-governor/rulebooks/`.
+---
 
-### Team policy sharing & drift detection
+## 📊 Performance
 
-Commit `governor.config.json`. `governor status` compares the working copy against the committed baseline and flags every local weakening — removed protected files, deleted bash patterns, disabled AST flags, turned-off injection scanning — so policy drift shows up in review, not in production:
+| Check Type | Runtime | Execution Time |
+| --- | --- | --- |
+| Config shield (PreToolUse) | Node dispatcher | < 8ms |
+| JS/TS AST | Babel | < 28ms (1000 LOC) |
+| Python stdlib `ast` | `python3` | ~50ms (process start dominates; parse is 0.02ms) |
+| Rust/Go/Kotlin/Swift/C/C++/Dart | ast-grep (tree-sitter) | < 7ms (500 LOC) |
+| Regex SOP (fallback) | Node | < 5ms |
 
-```bash
-npx agent-governor status   # exit 1 if local policy is weaker than committed
-```
-
-Wire it into CI so a PR cannot silently loosen protection:
-
-```yaml
-- run: npx agent-governor doctor   # hooks installed? config valid? deny works?
-- run: npx agent-governor status   # policy weakened vs committed?
-```
+Run `npm run build` to emit `dist/*.js` bundles.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are very welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) to get started.
+Contributions are very welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-1. Fork the Repository
-2. Create your Feature Branch (`git checkout -b feat/amazing-rule`)
-3. Commit your Changes (`git commit -m 'feat: add new AST rule'`)
-4. Push to the Branch (`git push origin feat/amazing-rule`)
-5. Open a Pull Request
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feat/amazing-rule`)
+3. Commit your changes
+4. Push and open a Pull Request
+
+Security findings: please use [GitHub Security Advisories](https://github.com/lihenair/agent-governor/security/advisories/new) instead of public issues. See [SECURITY.md](./SECURITY.md) for the threat model.
 
 ---
 
 ## 📜 License
 
-Distributed under the MIT License. See [LICENSE](./LICENSE) for more information.
+MIT. See [LICENSE](./LICENSE).
 
 <div align="center">
 <p>Crafted for high-determinism AI engineering.</p>
