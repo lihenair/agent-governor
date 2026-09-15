@@ -1,0 +1,27 @@
+{
+  "name": "agent-governor",
+  "owner": {
+    "name": "lihenair"
+  },
+  "metadata": {
+    "description": "Deterministic runtime guardrails for Claude Code & AI coding agents",
+    "version": "0.4.0"
+  },
+  "plugins": [
+    {
+      "name": "agent-governor",
+      "source": "./plugin",
+      "description": "Deterministic guardrails: blocks config tampering, dangerous Bash, source-policy violations, and read-side prompt injection",
+      "author": {
+        "name": "lihenair"
+      },
+      "keywords": [
+        "guardrails",
+        "security",
+        "hooks",
+        "prompt-injection",
+        "ai-safety"
+      ]
+    }
+  ]
+}

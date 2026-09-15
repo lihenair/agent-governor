@@ -206,10 +206,28 @@ npx agent-governor hook
 npx agent-governor pre-check
 npx agent-governor post-check
 npx agent-governor session-hook --event SessionStart   # 规则重注入（init 自动接线）
+npx agent-governor doctor                              # 自检：运行时、配置、Hook、审计状态
+npx agent-governor status                              # 当前策略 + 本地与提交基线的漂移
+npx agent-governor explain "git reset --hard"          # 这条命令为什么会被拦？
+npx agent-governor explain path/to/tsconfig.json
 npx agent-governor report                              # 审计摘要：拦截数、Top 规则、最近一次拦截
 npx agent-governor report --json
+npx agent-governor rule list                           # 已安装的规则包
+npx agent-governor rule add terraform aws              # 启用叠加式规则包
 npx agent-governor version
 ```
+
+### 作为 Claude Code 插件安装
+
+无需 `init`——插件自动接好全部 Hook：
+
+```bash
+# 在 Claude Code 里：
+/plugin marketplace add lihenair/agent-governor
+/plugin install agent-governor@agent-governor
+```
+
+或者继续用 npm 流程：`npm install -D agent-governor && npx agent-governor init`。
 
 ### 预设规则包
 
@@ -243,9 +261,31 @@ GOVERNOR_PRESET=security-hard npx agent-governor test --command "npm install --f
 - 检测器：指令覆盖（`ignore previous instructions`）、角色劫持、`curl \| sh` payload、env / 密钥外传、零宽字符隐写。
 - 评分 ≥ 2 拦截并把原因回传给 agent；`injectionMode: "off"` 关闭；`injectionPatterns` 支持自定义正则检测器。
 
-### 会话 / 压缩重注入
+### 规则包（Rulebooks）：只加不减
 
-`init` 自动接好 `SessionStart` 和 `PreCompact` Hook。上下文被清空或压缩后，governor 会重新注入一段简短提醒：哪些规则在生效、agent 被拦过几次、护栏不能从会话内部关闭。架构漂移死在它出生的那一刻。
+除内置预设外，还可安装**规则包**——社区策略包，只能*增加*保护，不能减少（规则包碰不到 `unprotect`、`override`，也关不掉注入扫描）：
+
+```bash
+npx agent-governor rule add terraform aws k8s   # 在 governor.config.json 里激活
+npx agent-governor rule list
+```
+
+官方包在 [`rulebooks/`](./rulebooks)：`terraform`（state/lock/清单 + `apply -auto-approve`、`destroy`）、`aws`（IAM/EC2/CloudFormation 破坏性操作）、`k8s`（删命名空间、`helm uninstall`、force apply）。自己写一个 JSON 放到 `.agent-governor/rulebooks/` 即可。
+
+### 团队策略共享与漂移检测
+
+把 `governor.config.json` 提交进仓库。`governor status` 会把工作区副本和已提交基线对比，标出每一处本地削弱——被移除的保护文件、被删的 Bash 模式、被关的 AST 开关、被关的注入扫描——让策略漂移在 code review 里现形，而不是在事故里：
+
+```bash
+npx agent-governor status   # 本地策略弱于提交基线时 exit 1
+```
+
+接进 CI，PR 就没法悄悄放松保护：
+
+```yaml
+- run: npx agent-governor doctor   # Hook 装了吗？配置合法吗？拦截有效吗？
+- run: npx agent-governor status   # 策略被削弱了吗？
+```
 
 ---
 

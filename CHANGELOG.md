@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-09-15
+
+### Added
+
+- **Claude Code plugin distribution**: `.claude-plugin/marketplace.json` +
+  `plugin/` — install with `/plugin marketplace add lihenair/agent-governor`
+  then `/plugin install agent-governor@agent-governor`. Plugin hooks wire all
+  events including SessionStart/PreCompact and read-side scanning, with a
+  `setup` skill.
+- **`governor doctor`**: self-check everything the guardrails depend on —
+  Node version, package integrity, config validity, hooks actually installed,
+  audit writability, and a live deny dry-run. Exit 1 on failure; every failing
+  check ships an actionable fix.
+- **`governor status`**: team policy drift detection. Compares the working
+  `governor.config.json` against the committed baseline and flags local
+  weakening (unprotected files, removed bash patterns, disabled AST flags,
+  injection scanning turned off). Exit 1 on drift — wire into CI.
+- **`explain <command|file>`**: explain what the governor would do with one
+  specific target and why (rule rationale + fix + override hint). The
+  original `explain --config` rule dump is unchanged.
+- **Rulebooks: additive policy packs.** JSON packs under `rulebooks/` that can
+  only add protection — `unprotect`, `override`, `injectionMode: "off"`, and
+  `preset` are stripped on load by construction. Official packs: `terraform`,
+  `aws`, `k8s`. Activate with the `rule add` command or the config's
+  `rulebooks` field.
+- **SECURITY.md**: documented threat model — what standard mode is and is not,
+  hardening recommendations, and known limitations.
+
 ## [0.3.0] - 2026-09-15
 
 ### Added

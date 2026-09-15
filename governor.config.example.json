@@ -32,8 +32,14 @@
     "noDirectEval": true,
     "noNewFunction": true,
     "requireErrorBoundary": false,
-    "pythonForbiddenCalls": ["eval", "exec"],
-    "pythonDeprecatedImports": ["imp", "optparse"],
+    "pythonForbiddenCalls": [
+      "eval",
+      "exec"
+    ],
+    "pythonDeprecatedImports": [
+      "imp",
+      "optparse"
+    ],
     "rustForbidUnsafe": true,
     "goForbidPanic": false,
     "dartForbidMirrors": true,
@@ -41,5 +47,10 @@
     "kotlinForbidBangBang": true,
     "cppForbidUnsafeC": true,
     "javaForbidRuntimeExec": true
-  }
+  },
+  "rulebooks": [
+    "terraform",
+    "aws"
+  ],
+  "_comment_rulebooks": "additive-only packs from rulebooks/ — see README"
 }

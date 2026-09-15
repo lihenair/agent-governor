@@ -241,16 +241,37 @@ export async function loadConfig(cwd = process.cwd()) {
       const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
       // File-level `preset` field wins over the env var; both feed getPreset.
       const preset = getPreset(parsed.preset || presetName);
-      return mergeConfig(mergeConfig(CONFIG, preset), parsed);
+      const withPreset = mergeConfig(mergeConfig(CONFIG, preset), parsed);
+      return withRulebooks(withPreset, parsed.rulebooks, cwd);
     }
 
     const loaded = await importConfigModule(filePath);
     const preset = getPreset(loaded?.preset || presetName);
-    return mergeConfig(mergeConfig(CONFIG, preset), loaded);
+    const withPreset = mergeConfig(mergeConfig(CONFIG, preset), loaded);
+    return withRulebooks(withPreset, loaded?.rulebooks, cwd);
   }
 
   const preset = getPreset(presetName);
-  return mergeConfig(CONFIG, preset);
+  return withRulebooks(mergeConfig(CONFIG, preset), null, cwd);
+}
+
+/**
+ * Apply rulebooks (additive-only packs) on top of a resolved config.
+ *
+ * @param {object} config resolved config
+ * @param {string[]|undefined} refs rulebook names from the config's rulebooks field
+ * @param {string} cwd project root
+ */
+async function withRulebooks(config, refs, cwd) {
+  // Also honor GOVERNOR_RULEBOOKS env (comma-separated), set by `rule add --use`.
+  const envRefs = (process.env.GOVERNOR_RULEBOOKS || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const all = [...(refs || []), ...envRefs];
+  if (all.length === 0) {
+    return config;
+  }
+  const { loadRulebooks } = await import('./rulebooks.js');
+  const { fragment } = loadRulebooks(all, cwd);
+  return mergeConfig(config, fragment);
 }
 
 export function extractFilePaths(toolName, toolInput = {}) {

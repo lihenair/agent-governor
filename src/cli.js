@@ -8,6 +8,9 @@ import { runPostToolUseGuard } from './post-tool-use.js';
 import { runPreToolUseGuard } from './pre-tool-use.js';
 import { runSessionHook } from './session-context.js';
 import { buildReport, formatReport } from './report.js';
+import { formatDoctorReport, runDoctor } from './doctor.js';
+import { buildStatus, formatStatus } from './status.js';
+import { explainTarget } from './explain.js';
 import { getPreset } from './presets.js';
 import { emitBlock, exitAllow, exitBlock } from './stdin.js';
 
@@ -51,7 +54,14 @@ Commands:
                Dry-run an Edit/Write against evaluatePreToolUse
   explain [--config governor.config.json]
                Print compiled rule ids and counts
+  explain "git reset --hard" | explain path/to/file
+               Explain what the governor would do with one target, and why
   report       Summarize the audit log: blocks, top rules, last intervention
+  doctor       Self-check runtime, config, hooks, audit state; exit 1 on failure
+  status       Show active policy and local-vs-committed drift; exit 1 on drift
+  rule list    List installed rulebooks (additive policy packs)
+  rule add <name...>
+               Activate rulebooks in governor.config.json
   version      Print the package version
   help         Show this message
 
@@ -171,6 +181,21 @@ export async function runCli(argv = process.argv.slice(2)) {
     }
     case 'explain': {
       const flags = parseFlags(argv.slice(1));
+      // explain <command|file> — explain one specific target.
+      if (flags._ && flags._.length > 0) {
+        const target = flags._.join(' ');
+        const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+        const config = await loadConfig(projectRoot);
+        const looksLikeFile = !target.includes(' ') && (target.includes('/') || target.includes('.') );
+        const dryFlags = looksLikeFile
+          ? { file: target }
+          : { command: target };
+        const evaluation = runDryTest(dryFlags, { config, projectRoot });
+        process.stdout.write(`${explainTarget({ command: dryFlags.command, file: dryFlags.file, operation: dryFlags.operation }, config, evaluation)}\n`);
+        exitAllow();
+        break;
+      }
+      // explain --config — dump the compiled rule set (original behavior).
       const config = await loadExplainConfig(flags.config);
       process.stdout.write(explainConfig(config));
       exitAllow();
@@ -185,6 +210,60 @@ export async function runCli(argv = process.argv.slice(2)) {
           ? `${JSON.stringify(report, null, 2)}\n`
           : formatReport(report)
       );
+      exitAllow();
+      break;
+    }
+    case 'doctor': {
+      const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      const report = await runDoctor(projectRoot);
+      process.stdout.write(formatDoctorReport(report));
+      process.exit(report.ok ? 0 : 1);
+      break;
+    }
+    case 'status': {
+      const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      const report = await buildStatus(projectRoot);
+      process.stdout.write(formatStatus(report));
+      const drift = report.checks.find((c) => c.id === 'policy-drift');
+      process.exit(drift && !drift.ok ? 1 : 0);
+      break;
+    }
+    case 'rule': {
+      const sub = argv[1] || 'help';
+      const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      if (sub === 'list') {
+        const dir = path.join(projectRoot, 'rulebooks');
+        const local = path.join(projectRoot, '.agent-governor', 'rulebooks');
+        const found = [dir, local]
+          .filter((d) => fs.existsSync(d))
+          .flatMap((d) => fs.readdirSync(d).filter((f) => f.endsWith('.json')))
+          .map((f) => f.replace(/\.json$/, ''));
+        process.stdout.write(`available rulebooks: ${found.length > 0 ? found.join(', ') : '(none installed)'}\n`);
+        process.stdout.write(`place JSON packs in rulebooks/ or .agent-governor/rulebooks/, then reference them in governor.config.json:\n  { "rulebooks": ["terraform", "aws"] }\n`);
+        exitAllow();
+        break;
+      }
+      if (sub === 'add') {
+        const names = argv.slice(2).filter((a) => !a.startsWith('--'));
+        if (names.length === 0) {
+          emitBlock('usage: agent-governor rule add <name...>   (JSON files from rulebooks/)');
+          process.exit(1);
+        }
+        const configPath = path.join(projectRoot, 'governor.config.json');
+        const config = fs.existsSync(configPath)
+          ? JSON.parse(fs.readFileSync(configPath, 'utf8'))
+          : {};
+        const existing = new Set(config.rulebooks || []);
+        for (const name of names) {
+          existing.add(name);
+        }
+        config.rulebooks = [...existing].sort();
+        fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+        process.stdout.write(`rulebooks active: ${config.rulebooks.join(', ')}\nRun 'npx agent-governor explain --config governor.config.json' to see the merged policy.\n`);
+        exitAllow();
+        break;
+      }
+      process.stdout.write('usage: agent-governor rule <list|add>\n');
       exitAllow();
       break;
     }

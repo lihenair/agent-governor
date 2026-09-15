@@ -1,0 +1,12 @@
+{
+  "name": "aws",
+  "description": "AWS shield: block destructive CLI operations and credential exposure",
+  "forbiddenBashPatterns": [
+    "aws\\s+s3\\s+rb\\b",
+    "aws\\s+iam\\s+delete-[\\s\\S]*",
+    "aws\\s+ec2\\s+terminate-instances\\b",
+    "aws\\s+cloudformation\\s+delete-stack\\b",
+    "aws\\s+configure\\s+set\\b",
+    "cat[\\s\\S]*\\.aws/credentials[\\s\\S]*\\|"
+  ]
+}

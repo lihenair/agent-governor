@@ -1,0 +1,12 @@
+{
+  "name": "k8s",
+  "description": "Kubernetes shield: block cluster-wide destructive operations",
+  "forbiddenBashPatterns": [
+    "kubectl\\s+delete\\s+(?:ns|namespace)\\b",
+    "kubectl\\s+delete\\s+(?: pods|deployments|services|statefulsets|daemonsets)[\\s\\S]*--all",
+    "kubectl\\s+drain\\b",
+    "helm\\s+uninstall\\b",
+    "kubectl\\s+apply[\\s\\S]*--force"
+  ],
+  "protectedFiles": ["Chart.yaml", "values.yaml"]
+}

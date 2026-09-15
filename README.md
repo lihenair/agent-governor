@@ -244,10 +244,28 @@ npx agent-governor hook
 npx agent-governor pre-check
 npx agent-governor post-check
 npx agent-governor session-hook --event SessionStart   # rule re-injection (auto-wired by init)
+npx agent-governor doctor                              # self-check: runtime, config, hooks, audit state
+npx agent-governor status                              # active policy + local-vs-committed drift
+npx agent-governor explain "git reset --hard"          # why would this be blocked?
+npx agent-governor explain path/to/tsconfig.json
 npx agent-governor report                              # audit digest: blocks, top rules, last intervention
 npx agent-governor report --json
+npx agent-governor rule list                           # installed rulebooks
+npx agent-governor rule add terraform aws              # activate additive policy packs
 npx agent-governor version
 ```
+
+### Install as a Claude Code plugin
+
+No `init` needed — the plugin wires every hook for you:
+
+```bash
+# inside Claude Code:
+/plugin marketplace add lihenair/agent-governor
+/plugin install agent-governor@agent-governor
+```
+
+Or keep the npm flow: `npm install -D agent-governor && npx agent-governor init`.
 
 ### Preset policy packs
 
@@ -281,9 +299,31 @@ Every other guardrail watches what the agent **writes**. Agent Governor also wat
 - Detectors: instruction override (`ignore previous instructions`), role hijack, `curl | sh` payloads, env/secret exfiltration, hidden zero-width Unicode smuggling.
 - Score ≥ 2 blocks and feeds the reason back to the agent; `injectionMode: "off"` disables it; `injectionPatterns` accepts your own regex detectors.
 
-### Session/compaction re-injection
+### Rulebooks: additive policy packs
 
-`init` wires `SessionStart` and `PreCompact` hooks automatically. After a context wipe or compaction, the governor re-injects a short reminder: which rules are active, how many times the agent has been blocked, and that the guardrails cannot be disabled from inside the session. Architecture drift dies at the exact moment it used to be born.
+Beyond built-in presets, install **rulebooks** — community policy packs that can only *add* protection, never subtract (a rulebook cannot touch `unprotect`, `override`, or turn injection scanning off):
+
+```bash
+npx agent-governor rule add terraform aws k8s   # activate packs in governor.config.json
+npx agent-governor rule list
+```
+
+Official packs ship in [`rulebooks/`](./rulebooks): `terraform` (state/lock/manifests + `apply -auto-approve`, `destroy`), `aws` (destructive IAM/EC2/CloudFormation ops), `k8s` (namespace deletion, `helm uninstall`, force apply). Write your own as JSON and drop it in `.agent-governor/rulebooks/`.
+
+### Team policy sharing & drift detection
+
+Commit `governor.config.json`. `governor status` compares the working copy against the committed baseline and flags every local weakening — removed protected files, deleted bash patterns, disabled AST flags, turned-off injection scanning — so policy drift shows up in review, not in production:
+
+```bash
+npx agent-governor status   # exit 1 if local policy is weaker than committed
+```
+
+Wire it into CI so a PR cannot silently loosen protection:
+
+```yaml
+- run: npx agent-governor doctor   # hooks installed? config valid? deny works?
+- run: npx agent-governor status   # policy weakened vs committed?
+```
 
 ---
 

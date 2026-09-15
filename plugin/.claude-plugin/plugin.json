@@ -1,0 +1,19 @@
+{
+  "name": "agent-governor",
+  "version": "0.4.0",
+  "description": "Deterministic runtime guardrails: config shield, dangerous Bash blocking, polyglot source policy, read-side prompt injection scanning, session re-injection",
+  "author": {
+    "name": "lihenair"
+  },
+  "repository": "https://github.com/lihenair/agent-governor",
+  "license": "MIT",
+  "keywords": [
+    "guardrails",
+    "hooks",
+    "security",
+    "prompt-injection",
+    "ai-safety",
+    "ast",
+    "policy"
+  ]
+}

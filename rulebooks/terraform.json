@@ -1,0 +1,18 @@
+{
+  "name": "terraform",
+  "description": "Infrastructure-as-code shield: protect Terraform state, lock and module manifests; block destructive apply/destroy",
+  "protectedFiles": [
+    "main.tf",
+    "variables.tf",
+    "outputs.tf",
+    "versions.tf",
+    "terraform.lock.hcl",
+    ".terraform-version"
+  ],
+  "forbiddenBashPatterns": [
+    "terraform\\s+(?:apply|destroy)[\\s\\S]*-auto-approve",
+    "terraform\\s+destroy\\b",
+    "terraform\\s+state\\s+rm\\b",
+    "terraform\\s+force-unlock\\b"
+  ]
+}
