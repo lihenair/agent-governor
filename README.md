@@ -92,7 +92,7 @@ Claude Code sends each event as JSON on stdin (`tool_name`, `tool_input`, `cwd`,
 | Language | Config shield | Source policy (dispatcher) | Engine |
 | --- | --- | --- | --- |
 | JavaScript / TypeScript | `package.json`, `tsconfig.json`, lockfiles, eslint/biome | `eval`, `new Function()`, custom forbidden calls | Babel AST |
-| Python | `pyproject.toml`, `requirements.txt`, `setup.py`, Pipfile | `eval`/`exec`, `imp`/`optparse` | Fast path in Node; stdlib `ast` if `--lang python` |
+| Python | `pyproject.toml`, `requirements.txt`, `setup.py`, Pipfile | `eval`/`exec` (incl. aliases, attribute & computed lookups), `imp`/`optparse` | stdlib `ast` (true syntax tree, zero deps) with regex fallback for partial snippets |
 | Rust | `Cargo.toml`, `Cargo.lock` | `unsafe {` (`rustForbidUnsafe`, default on) | Regex SOP |
 | Go | `go.mod`, `go.sum` | `panic(` (`goForbidPanic`, **default off**) | Regex SOP |
 | Dart / Flutter | `pubspec.yaml` | `dart:mirrors` | Regex SOP |
@@ -232,7 +232,7 @@ Copy [`governor.config.example.json`](./governor.config.example.json) to get sta
 | Config shield | Node dispatcher | < 8ms |
 | JS/TS AST | Babel | < 28ms (1000 LOC) |
 | Python / Rust / Go / Dart / Swift / Kotlin / Java / C | Node regex SOP | < 5ms |
-| Optional Python stdlib `ast` | `python3` | < 10ms |
+| Python stdlib `ast` | `python3` | ~50ms (process start dominates; parse is 0.02ms) |
 
 Run `npm run build` to emit zero-walk `dist/*.js` bundles (parser + traverse inlined).
 

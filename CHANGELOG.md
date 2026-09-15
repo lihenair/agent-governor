@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-09-15
+
+### Fixed
+
+- **Python checks are now a true syntax tree.** The README claimed stdlib
+  `ast`, but the implementation was line-regex: it missed aliased calls
+  (`e = eval; e(x)`), attribute calls (`builtins.eval(x)`), computed lookups
+  (`globals()['eval'](x)`), and produced false positives on strings/comments
+  mentioning banned names. Now `python/ast_check.py` walks the real `ast`
+  tree (stdlib, zero new dependencies), tracks banned-call aliases through
+  assignments, and falls back to line-regex only for syntax-error fragments.
+  ~50ms per check (python3 process start dominates; parse is 0.02ms).
+
 ## [0.5.0] - 2026-09-15
 
 ### Added

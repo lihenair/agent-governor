@@ -1,5 +1,5 @@
 {
   "name": "agent-governor",
   "description": "Deterministic PreToolUse/PostToolUse guardrails for Claude Code. Blocks config tampering and language-specific source policy violations.",
-  "version": "0.5.0"
+  "version": "0.5.1"
 }
