@@ -1,6 +1,6 @@
 {
   "name": "agent-governor",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Deterministic Runtime Guardrails for Claude Code & AI Coding Agents",
   "license": "MIT",
   "type": "module",
@@ -59,11 +59,25 @@
   "homepage": "https://github.com/lihenair/agent-governor#readme",
   "author": "lihenair",
   "dependencies": {
+    "@ast-grep/napi": "^0.45.3",
     "@babel/parser": "^7.28.0",
     "@babel/traverse": "^7.28.0",
     "shell-quote": "^1.10.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.9"
+  },
+  "optionalDependencies": {
+    "@ast-grep/lang-c": "^0.0.6",
+    "@ast-grep/lang-cpp": "^0.0.6",
+    "@ast-grep/lang-csharp": "^0.0.6",
+    "@ast-grep/lang-dart": "^0.0.7",
+    "@ast-grep/lang-go": "^0.0.6",
+    "@ast-grep/lang-java": "^0.0.7",
+    "@ast-grep/lang-kotlin": "^0.0.7",
+    "@ast-grep/lang-php": "^0.0.7",
+    "@ast-grep/lang-ruby": "^0.0.7",
+    "@ast-grep/lang-rust": "^0.0.7",
+    "@ast-grep/lang-swift": "^0.0.8"
   }
 }

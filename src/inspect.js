@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { astGrepSupports, inspectWithAstGrep } from './ast-grep-engine.js';
 import * as parser from '@babel/parser';
 import traverse from '@babel/traverse';
 import { CONFIG } from './config.js';
@@ -327,6 +328,20 @@ export function inspectSource(filePath, code, config = CONFIG) {
   if (!language) {
     return [];
   }
+
+  // ast-grep engine: structural checks for the 7 regex-SOP languages.
+  // JS/TS and Python keep their dedicated inspectors (Babel / stdlib ast).
+  // Engine unavailable (napi or lang pack missing) → regex SOP fallback.
+  if (['rust', 'go', 'kotlin', 'swift', 'java', 'c', 'cpp', 'dart'].includes(language)) {
+    if (config.engine === 'ast-grep' && astGrepSupports(filePath)) {
+      const astErrors = inspectWithAstGrep(filePath, code, config);
+      if (astErrors !== null) {
+        return astErrors;
+      }
+    }
+    return INSPECTORS[language](filePath, code, config);
+  }
+
   return INSPECTORS[language](filePath, code, config);
 }
 

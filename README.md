@@ -4,6 +4,8 @@
 
 **Deterministic Runtime Guardrails for Claude Code, Codex CLI & Gemini CLI**
 
+*Syntax-tree-level code checks (tree-sitter), read-side injection scanning, and hardware-grade hooks.*
+
 *Stop prompt injection, architecture drift, and configuration tampering with hardware-grade hooks.*
 
 One config, three coding agents. See [docs/hosts.md](./docs/hosts.md).
@@ -93,13 +95,21 @@ Claude Code sends each event as JSON on stdin (`tool_name`, `tool_input`, `cwd`,
 | --- | --- | --- | --- |
 | JavaScript / TypeScript | `package.json`, `tsconfig.json`, lockfiles, eslint/biome | `eval`, `new Function()`, custom forbidden calls | Babel AST |
 | Python | `pyproject.toml`, `requirements.txt`, `setup.py`, Pipfile | `eval`/`exec` (incl. aliases, attribute & computed lookups), `imp`/`optparse` | stdlib `ast` (true syntax tree, zero deps) with regex fallback for partial snippets |
-| Rust | `Cargo.toml`, `Cargo.lock` | `unsafe {` (`rustForbidUnsafe`, default on) | Regex SOP |
-| Go | `go.mod`, `go.sum` | `panic(` (`goForbidPanic`, **default off**) | Regex SOP |
-| Dart / Flutter | `pubspec.yaml` | `dart:mirrors` | Regex SOP |
-| Swift / iOS | `Podfile`, `Package.swift` | `try!`, `as!` | Regex SOP |
-| Kotlin / Android | `build.gradle(.kts)`, `settings.gradle`, `AndroidManifest.xml` | `!!`, `TODO()` | Regex SOP |
+| Rust | `Cargo.toml`, `Cargo.lock` | `unsafe {` blocks (`rustForbidUnsafe`, default on) | tree-sitter (ast-grep) or regex SOP |
+| Go | `go.mod`, `go.sum` | `panic(` calls (`goForbidPanic`, **default off**) | tree-sitter (ast-grep) or regex SOP |
+| Dart / Flutter | `pubspec.yaml` | `dart:mirrors` imports | tree-sitter (ast-grep) or regex SOP |
+| Swift / iOS | `Podfile`, `Package.swift` | `try!` (structural `try_operator`) | tree-sitter (ast-grep) or regex SOP |
+| Kotlin / Android | `build.gradle(.kts)`, `settings.gradle`, `AndroidManifest.xml` | `!!` force unwrap (structural postfix) | tree-sitter (ast-grep) or regex SOP |
 | Java | Gradle / manifest | `Runtime.getRuntime().exec()` | Regex SOP |
-| C / C++ | `CMakeLists.txt`, `Makefile` | `gets()`, `system()` | Regex SOP |
+| C / C++ | `CMakeLists.txt`, `Makefile` | `gets()`, `system()` calls | tree-sitter (ast-grep) or regex SOP |
+
+> **Why syntax trees beat regex for code checks:** line-regex cannot tell
+> `unsafe { x() }` (real code) from `"never write unsafe { }"` (a string
+> literal) — it flags both. Tree-sitter grammars know strings and comments are
+> not statements, so structural rules have **zero false positives** on
+> non-code text. Enable with `"engine": "ast-grep"` in `governor.config.json`
+> (auto-detects installed `@ast-grep/lang-*` packs; graceful regex fallback
+> when missing).
 
 ### IDE / agent support
 

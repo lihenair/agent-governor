@@ -122,6 +122,13 @@ export const CONFIG = {
    * pattern is a regex source string (case-insensitive) or RegExp.
    */
   injectionPatterns: [],
+
+  /**
+   * Source-check engine: 'regex' (default, zero native deps) or 'ast-grep'
+   * (tree-sitter structural checks for rust/go/kotlin/swift/java/c/cpp/dart,
+   * requires the @ast-grep/lang-* optional packages).
+   */
+  engine: 'regex',
 };
 
 const WRITE_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
@@ -218,6 +225,7 @@ export function toJsonConfig(config = CONFIG) {
     astRules: config.astRules,
     injectionMode: config.injectionMode || 'scan',
     injectionPatterns: config.injectionPatterns || [],
+    engine: config.engine || 'regex',
   };
 }
 

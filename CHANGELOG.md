@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-16
+
+### Added
+
+- **Tree-sitter structural engine (`ast-grep`)**: opt-in
+  `"engine": "ast-grep"` in `governor.config.json` upgrades Rust / Go /
+  Kotlin / Swift / C / C++ / Dart source checks from line-regex to true
+  syntax-tree matching via `@ast-grep/napi` (ast-grep = tree-sitter-based
+  structural search, 15.9k★). Strings and comments are structurally
+  immune to false positives (`"never write unsafe { }"` no longer trips the
+  Rust guard). Kotlin `!!` is detected as a structural postfix operator,
+  Swift `try!` as a `try_operator` node, Rust `unsafe` as `unsafe_block`.
+- **Optional `@ast-grep/lang-*` packs**: rust / go / kotlin / swift / c /
+  cpp / dart ship as `optionalDependencies` (prebuilt binaries — no local
+  compiler needed). Missing packs degrade that language to the regex SOP;
+  `registerDynamicLanguage` is called exactly once with every installed pack
+  (napi requires single-shot registration before first parse).
+- Node position API: line numbers derive from `node.range().start.line`.
+
+### Fixed
+
+- Shell-tool normalization (`shell` / `run_shell_command`) no longer runs on
+  write-tool payloads (Edit/Write/MultiEdit), which previously suppressed the
+  protected-file rule for non-Bash tools.
+
 ## [0.5.1] - 2026-09-15
 
 ### Fixed
