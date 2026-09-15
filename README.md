@@ -2,9 +2,11 @@
 
 # 🛡️ Agent Governor
 
-**Deterministic Runtime Guardrails for Claude Code & AI Coding Agents**
+**Deterministic Runtime Guardrails for Claude Code, Codex CLI & Gemini CLI**
 
 *Stop prompt injection, architecture drift, and configuration tampering with hardware-grade hooks.*
+
+One config, three coding agents. See [docs/hosts.md](./docs/hosts.md).
 
 [English](./README.md) | [简体中文](./README_ZH.md)
 

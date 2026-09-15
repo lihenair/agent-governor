@@ -11,8 +11,9 @@ import { buildReport, formatReport } from './report.js';
 import { formatDoctorReport, runDoctor } from './doctor.js';
 import { buildStatus, formatStatus } from './status.js';
 import { explainTarget } from './explain.js';
+import { formatOutput, normalizeInput } from './hosts.js';
 import { getPreset } from './presets.js';
-import { emitBlock, exitAllow, exitBlock } from './stdin.js';
+import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
 function readVersion() {
   const here = path.dirname(path.resolve(process.argv[1] || process.cwd()));
@@ -80,12 +81,23 @@ async function runGuard(kind) {
         ? runHookGuard
         : runPreToolUseGuard;
   try {
-    const result = await runner();
-    if (result.stderr) {
-      emitBlock(result.stderr);
+    const rawPayload = await readStdin(process.stdin);
+    const { payload: normalized, host } = normalizeInput(rawPayload);
+    const event = normalized?.hook_event_name || '';
+    const result = await runner({ stdin: null, payloadOverride: normalized });
+    if (host === 'claude-code') {
+      if (result.stderr) {
+        emitBlock(result.stderr);
+      }
+      if (result.exitCode === 2) {
+        exitBlock();
+      }
+      exitAllow();
     }
-    if (result.exitCode === 2) {
-      exitBlock();
+    // Non-Claude hosts: JSON decision on stdout, always exit 0.
+    const out = formatOutput(result, { host, event });
+    if (out.stdout) {
+      process.stdout.write(`${out.stdout}\n`);
     }
     exitAllow();
   } catch (err) {

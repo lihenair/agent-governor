@@ -22,8 +22,8 @@ export async function evaluateHook(payload, config, projectRoot, io) {
   return evaluatePreToolUse(payload, config, projectRoot);
 }
 
-export async function runHookGuard({ stdin = process.stdin, load = loadConfig, io } = {}) {
-  const payload = await readStdin(stdin);
+export async function runHookGuard({ stdin = process.stdin, load = loadConfig, io, payloadOverride } = {}) {
+  const payload = payloadOverride !== undefined ? payloadOverride : await readStdin(stdin);
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
   const started = Date.now();

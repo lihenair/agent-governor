@@ -55,8 +55,9 @@ export async function runPostToolUseGuard({
   stdin = process.stdin,
   load = loadConfig,
   io,
+  payloadOverride,
 } = {}) {
-  const payload = await readStdin(stdin);
+  const payload = payloadOverride !== undefined ? payloadOverride : await readStdin(stdin);
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
   const started = Date.now();

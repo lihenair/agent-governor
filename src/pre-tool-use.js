@@ -16,6 +16,17 @@ import { evaluate } from './policy/engine.js';
 import { compilePreToolPolicy } from './policy/rules.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
+/**
+ * Hosts whose shell tool has a different name but the same { command } shape.
+ * Codex names it `shell` (plus local shell wrappers); Gemini names it
+ * `run_shell_command`. Treat all of them as Bash for parsing purposes.
+ */
+const BASH_TOOL_NAMES = new Set(['Bash', 'shell', 'bash', 'run_shell_command', 'Shell']);
+
+function isBashLikeTool(toolName) {
+  return BASH_TOOL_NAMES.has(toolName);
+}
+
 export function evaluatePreToolUse(payload, config = CONFIG, projectRoot = process.cwd()) {
   if (!payload || !payload.tool_name) {
     return { exitCode: 0, action: 'allow', ruleId: null };
@@ -23,9 +34,12 @@ export function evaluatePreToolUse(payload, config = CONFIG, projectRoot = proce
 
   const toolInput = payload.tool_input || {};
   const command = toolInput.command || '';
-  const parsed = payload.tool_name === 'Bash' ? parseBash(command) : [];
+  const bashLike = isBashLikeTool(payload.tool_name);
+  const parsed = bashLike ? parseBash(command) : [];
   const ctx = {
-    toolName: payload.tool_name,
+    // Normalize shell-like tools (Codex `shell`, Gemini `run_shell_command`)
+    // to `Bash` so rules see one name; keep native write-tool names intact.
+    toolName: bashLike ? 'Bash' : payload.tool_name,
     toolInput,
     projectRoot,
     filePaths: extractFilePaths(payload.tool_name, toolInput),
@@ -52,8 +66,9 @@ export function evaluatePreToolUse(payload, config = CONFIG, projectRoot = proce
 export async function runPreToolUseGuard({
   stdin = process.stdin,
   load = loadConfig,
+  payloadOverride,
 } = {}) {
-  const payload = await readStdin(stdin);
+  const payload = payloadOverride !== undefined ? payloadOverride : await readStdin(stdin);
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
   const started = Date.now();

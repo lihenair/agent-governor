@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-09-15
+
+### Added
+
+- **Multi-host support: OpenAI Codex CLI + Google Gemini CLI.** The same
+  policy engine now protects three coding agents. `pre-check` / `post-check` /
+  `session-hook` auto-detect the calling host from the payload shape,
+  normalize it (Gemini `BeforeTool`→`PreToolUse`, `PreCompress`→`PreCompact`;
+  Codex 1:1), and emit decisions in each host's native contract (Claude Code
+  exit-2, Codex and Gemini JSON `decision` fields). Shell tools named `shell`
+  (Codex) and `run_shell_command` (Gemini) are analyzed as Bash.
+- **Host adapter configs ship in the package**: `adapters/codex-hooks.json`
+  and `adapters/gemini-settings-hooks.json`, plus a new
+  [`docs/hosts.md`](./docs/hosts.md) setup guide.
+
+### Fixed
+
+- Shell-tool name normalization no longer clobbers native write-tool names
+  (Edit/Write/MultiEdit) during policy evaluation.
+
 ## [0.4.0] - 2026-09-15
 
 ### Added

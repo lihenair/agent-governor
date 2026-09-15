@@ -1,0 +1,52 @@
+{
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "run_shell_command|write_file|replace|edit",
+        "sequential": false,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx agent-governor@latest pre-check",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": "write_file|replace|edit|web_fetch|google_web_search",
+        "sequential": false,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx agent-governor@latest post-check",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx agent-governor@latest session-hook --event SessionStart",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "PreCompress": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx agent-governor@latest session-hook --event PreCompact",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}

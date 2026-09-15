@@ -1,0 +1,51 @@
+{
+  "description": "Agent Governor — deterministic guardrails for OpenAI Codex CLI",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "shell|apply_patch|edit_file|write_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx agent-governor@latest pre-check",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch|edit_file|write_file|web_search",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx agent-governor@latest post-check",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx agent-governor@latest session-hook --event SessionStart",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx agent-governor@latest session-hook --event PreCompact",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}
