@@ -1,6 +1,6 @@
 {
   "name": "agent-governor",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Deterministic Runtime Guardrails for Claude Code & AI Coding Agents",
   "license": "MIT",
   "type": "module",
@@ -26,7 +26,8 @@
     "README.md",
     "README_ZH.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "governor.config.json"
   ],
   "scripts": {
     "test": "node --test --test-reporter=spec test/*.test.js",

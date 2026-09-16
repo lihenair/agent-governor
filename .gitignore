@@ -8,3 +8,4 @@ coverage/
 __pycache__/
 *.pyc
 tmp/
+governor.config.json
