@@ -36,6 +36,13 @@ Claude Code · OpenAI Codex CLI · Google Gemini CLI · Cursor · Windsurf
 
 - README.md / README_ZH.md rewritten to match v0.6 reality: capability
   comparison table, all 14 CLI commands, honest scope, real perf numbers.
+- (later) real terminal demo GIF `docs/demo.gif` (25KB) replaced the
+  placeholder svg; recording flow documented in demo/RECORDING.md.
+
+### Docs
+
+- README.md / README_ZH.md rewritten to match v0.6 reality: capability
+  comparison table, all 14 CLI commands, honest scope, real perf numbers.
 
 ### Fixed
 
