@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-09-16
+
+### Changed
+
+- **Package size: 898 kB → 63 kB tarball (−93%), unpacked 5.3 MB → 210 kB (−96%).**
+  Removed the unused `dist/` esbuild bundles (5.2 MB; `main`/`exports`/`bin`
+  all point to `src/` — nothing referenced `dist/`), excluded stray
+  `python/__pycache__/*.pyc`, and added the missing `rulebooks/` directory
+  and `CHANGELOG.md` to the published files (official rulebook packs were
+  not shipped before).
+
 ## [0.6.0] - 2026-09-16
 
 ### Added

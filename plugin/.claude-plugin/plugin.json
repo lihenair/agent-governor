@@ -1,6 +1,6 @@
 {
   "name": "agent-governor",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Deterministic runtime guardrails: config shield, dangerous Bash blocking, polyglot source policy, read-side prompt injection scanning, session re-injection",
   "author": {
     "name": "lihenair"

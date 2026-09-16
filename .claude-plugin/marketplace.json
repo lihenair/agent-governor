@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Deterministic runtime guardrails for Claude Code & AI coding agents",
-    "version": "0.6.0"
+    "version": "0.6.1"
   },
   "plugins": [
     {

@@ -1,7 +1,9 @@
 test/
 scripts/
 .git/
-.gitignore
 .github/
-docs/demo.svg
+docs/
 CONTRIBUTING.md
+python/__pycache__/
+**/__pycache__/
+*.pyc
