@@ -114,7 +114,7 @@ function parseFlags(argv) {
     const arg = argv[index];
     if (arg === '--json') {
       flags.json = true;
-    } else if (arg === '--command' || arg === '--file' || arg === '--operation' || arg === '--config' || arg === '--event' || arg === '--tail' || arg === '--engine') {
+    } else if (arg === '--command' || arg === '--file' || arg === '--operation' || arg === '--config' || arg === '--event' || arg === '--tail' || arg === '--engine' || arg === '--preset') {
       flags[arg.slice(2)] = argv[index + 1];
       index += 1;
     } else {
@@ -152,7 +152,8 @@ export async function runCli(argv = process.argv.slice(2)) {
   switch (command) {
     case 'init': {
       const lang = parseLangFlag(argv.slice(1));
-      const result = initProject(process.cwd(), { lang });
+      const preset = parseFlags(argv.slice(1)).preset;
+      const result = initProject(process.cwd(), { lang, preset });
       process.stdout.write(
         `[Agent Governor] Initialized for: ${result.langs.join(', ')}\n` +
           result.created.map((file) => `  + ${file}`).join('\n') +

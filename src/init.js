@@ -82,6 +82,18 @@ export function detectLanguages(cwd = process.cwd(), existsSync = fs.existsSync)
   return langs.length > 0 ? langs : ['node', 'python', 'native'];
 }
 
+/** Parse --preset <name> (aliases: -p). Returns undefined when absent. */
+export function parsePresetFlag(argv = []) {
+  const index = argv.findIndex((arg) => arg === '--preset' || arg.startsWith('--preset='));
+  if (index === -1) {
+    return undefined;
+  }
+  const raw = argv[index].startsWith('--preset=')
+    ? argv[index].slice('--preset='.length)
+    : argv[index + 1];
+  return raw || undefined;
+}
+
 export function parseLangFlag(argv = []) {
   const index = argv.findIndex((arg) => arg === '--lang' || arg.startsWith('--lang='));
   if (index === -1) {
@@ -201,6 +213,7 @@ export function initProject(
     copyFileSync = fs.copyFileSync,
     chmodSync = fs.chmodSync,
     lang = 'auto',
+    preset,
     packageRoot = findPackageRoot(),
   } = {}
 ) {
@@ -227,7 +240,13 @@ export function initProject(
   created.push(path.relative(cwd, settingsPath));
 
   if (!existsSync(configPath)) {
-    writeFileSync(configPath, EXAMPLE_CONFIG);
+    // With --preset, write a minimal config referencing the pack instead of
+    // the full default rules — full-copy configs would later override preset
+    // AST flags (e.g. strict's goForbidPanic: true).
+    writeFileSync(
+      configPath,
+      preset ? `${JSON.stringify({ preset }, null, 2)}\n` : EXAMPLE_CONFIG
+    );
     created.push(path.relative(cwd, configPath));
   }
 
