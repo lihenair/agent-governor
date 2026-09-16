@@ -18,6 +18,11 @@
 
 <br />
 
+<div align="center">
+  <img src="docs/demo.gif" alt="Agent Governor blocking unsafe agent operations" width="800px" />
+  <p><em>agent-governor blocking: config tampering · force-push · <code>eval()</code> in shipped code</em></p>
+</div>
+
 ---
 
 ## ⚡ The Problem

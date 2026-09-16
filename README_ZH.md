@@ -18,6 +18,11 @@
 
 <br />
 
+<div align="center">
+  <img src="docs/demo.gif" alt="Agent Governor blocking unsafe agent operations" width="800px" />
+  <p><em>agent-governor 拦截：配置篡改 · force-push · <code>eval()</code> 入库</em></p>
+</div>
+
 ---
 
 ## ⚡ 要解决什么问题
