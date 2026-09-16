@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-09-16
+
+### Added
+
+- **Cursor hard enforcement**: `hooks.json` adapter (`adapters/cursor-hooks.json`)
+  wiring `beforeShellExecution` / `beforeEditFile` / `beforeReadFile` /
+  `beforeMCPExecution` to the governor. Decisions emit as
+  `{ permission: "deny", agentMessage }` — Cursor's native contract. The old
+  "Cursor is rules-only" limitation is gone.
+- **Windsurf (Cascade) support**: `adapters/windsurf-hooks.json` wiring
+  `pre_run_command` / `pre_write_code` / `pre_read_code` (+ post events).
+  Exit-code contract (2 = block).
+- **OpenCode support**: `adapters/opencode-plugin.js` — an OpenCode plugin
+  that forwards `tool.execute.before/after` to the governor core; blocks by
+  throwing so OpenCode surfaces the reason to the model. Install by copying
+  to `.opencode/plugins/`.
+- Host adapters now normalize payload detection inside every guard runner
+  (not only the CLI), and `runGuard` passes exit codes through for
+  exit-code-contract hosts.
+
+### Supported hosts (hard enforcement)
+
+Claude Code · OpenAI Codex CLI · Google Gemini CLI · Cursor · Windsurf
+(Cascade) · OpenCode
+
 ## [0.6.2] - 2026-09-16
 
 ### Fixed

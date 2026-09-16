@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG, extractFilePaths, isWriteTool, loadConfig, resolveProjectRoot } from './config.js';
 import { formatInspectBlock, inspectAST, inspectSource } from './inspect.js';
+import { normalizeInput } from './hosts.js';
 import { evaluateReadScan } from './read-guard.js';
 import { logGuardDecision } from './audit/logger.js';
 import { ensureSelfProtect, mergeProtectResult } from './self-protect.js';
@@ -57,7 +58,8 @@ export async function runPostToolUseGuard({
   io,
   payloadOverride,
 } = {}) {
-  const payload = payloadOverride !== undefined ? payloadOverride : await readStdin(stdin);
+  const raw = payloadOverride !== undefined ? payloadOverride : await readStdin(stdin);
+  const { payload } = normalizeInput(raw);
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
   const started = Date.now();

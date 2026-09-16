@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "npx agent-governor@latest pre-check"
+      }
+    ],
+    "beforeEditFile": [
+      {
+        "command": "npx agent-governor@latest pre-check"
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "npx agent-governor@latest post-check"
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": "npx agent-governor@latest pre-check"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "npx agent-governor@latest post-check"
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": "npx agent-governor@latest post-check"
+      }
+    ]
+  }
+}

@@ -14,6 +14,7 @@ import { logGuardDecision } from './audit/logger.js';
 import { ensureSelfProtect, mergeProtectResult } from './self-protect.js';
 import { evaluate } from './policy/engine.js';
 import { compilePreToolPolicy } from './policy/rules.js';
+import { normalizeInput } from './hosts.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
 /**
@@ -68,7 +69,8 @@ export async function runPreToolUseGuard({
   load = loadConfig,
   payloadOverride,
 } = {}) {
-  const payload = payloadOverride !== undefined ? payloadOverride : await readStdin(stdin);
+  const raw = payloadOverride !== undefined ? payloadOverride : await readStdin(stdin);
+  const { payload } = normalizeInput(raw);
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
   const started = Date.now();

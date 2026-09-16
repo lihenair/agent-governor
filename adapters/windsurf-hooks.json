@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "pre_run_command": [
+      {
+        "command": "npx agent-governor@latest pre-check"
+      }
+    ],
+    "pre_write_code": [
+      {
+        "command": "npx agent-governor@latest pre-check"
+      }
+    ],
+    "pre_read_code": [
+      {
+        "command": "npx agent-governor@latest post-check"
+      }
+    ],
+    "post_write_code": [
+      {
+        "command": "npx agent-governor@latest post-check"
+      }
+    ],
+    "post_run_command": [
+      {
+        "command": "npx agent-governor@latest post-check"
+      }
+    ]
+  }
+}

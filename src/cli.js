@@ -82,9 +82,9 @@ async function runGuard(kind) {
         : runPreToolUseGuard;
   try {
     const rawPayload = await readStdin(process.stdin);
-    const { payload: normalized, host } = normalizeInput(rawPayload);
-    const event = normalized?.hook_event_name || '';
-    const result = await runner({ stdin: null, payloadOverride: normalized });
+    const { host, payload } = normalizeInput(rawPayload);
+    const event = payload?.hook_event_name || '';
+    const result = await runner({ stdin: null, payloadOverride: payload });
     if (host === 'claude-code') {
       if (result.stderr) {
         emitBlock(result.stderr);
@@ -94,10 +94,18 @@ async function runGuard(kind) {
       }
       exitAllow();
     }
-    // Non-Claude hosts: JSON decision on stdout, always exit 0.
+    // Non-Claude hosts:
+    //   codex / gemini-cli → JSON decision on stdout, exit 0
+    //   windsurf / opencode → exit-code contract (2 = block), reason on stderr
     const out = formatOutput(result, { host, event });
     if (out.stdout) {
       process.stdout.write(`${out.stdout}\n`);
+    }
+    if (out.stderr) {
+      emitBlock(out.stderr);
+    }
+    if (out.exitCode === 2) {
+      exitBlock();
     }
     exitAllow();
   } catch (err) {

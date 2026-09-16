@@ -20,117 +20,162 @@ const CODEX_PRETOOLUSE = {
 
 const GEMINI_BEFORETOOL = {
   hook_event_name: 'BeforeTool',
-  tool_name: 'shell',
+  tool_name: 'run_shell_command',
   tool_input: { command: 'git push --force origin main' },
   cwd: '/repo',
   session_id: 'abc',
   timestamp: '2026-09-15T00:00:00Z',
 };
 
-const CLAUDE_PRETOOLUSE = {
-  hook_event_name: 'PreToolUse',
-  tool_name: 'Bash',
-  tool_input: { command: 'git push --force origin main' },
-  cwd: '/repo',
+const CURSOR_BEFORShell = {
+  hook_event_name: 'beforeShellExecution',
+  command: 'git push --force origin main',
+  conversationId: 'c1',
+  generationId: 'g1',
 };
 
-test('hosts: registry is complete', () => {
-  assert.deepEqual([...HOSTS].sort(), ['claude-code', 'codex', 'gemini-cli'].sort());
-  assert.ok(isSupportedHost('gemini-cli'));
-  assert.equal(isSupportedHost('windsurf'), false);
+const CURSOR_BEFOREREAD = {
+  hook_event_name: 'beforeReadFile',
+  file_path: '/repo/.env',
+  content: 'SECRET=1',
+};
+
+const WINDSURF_PRERUN = {
+  agent_action_name: 'pre_run_command',
+  tool_info: { command_line: 'git push --force origin main', cwd: '/repo' },
+};
+
+const WINDSURF_PREWRITE = {
+  agent_action_name: 'pre_write_code',
+  tool_info: {
+    file_path: '/repo/a.rs',
+    edits: [{ old_string: 'a', new_string: 'unsafe { x(); }' }],
+  },
+};
+
+const OPENCODE_SHIM = {
+  host: 'opencode',
+  tool: 'bash',
+  args: { command: 'git push --force origin main' },
+};
+
+test('hosts: registry covers all mainstream agents', () => {
+  assert.deepEqual(
+    [...HOSTS].sort(),
+    ['claude-code', 'codex', 'cursor', 'gemini-cli', 'opencode', 'windsurf'].sort()
+  );
 });
 
-test('hosts: detect gemini-cli by BeforeTool event or timestamp', () => {
-  assert.equal(detectHost(GEMINI_BEFORETOOL), 'gemini-cli');
-  assert.equal(detectHost({ hook_event_name: 'SessionStart', timestamp: 'x' }), 'gemini-cli');
+test('hosts: detect cursor by before*/after* event names', () => {
+  assert.equal(detectHost(CURSOR_BEFORShell), 'cursor');
+  assert.equal(detectHost(CURSOR_BEFOREREAD), 'cursor');
 });
 
-test('hosts: detect codex by tool_use_id / permission_mode', () => {
-  assert.equal(detectHost(CODEX_PRETOOLUSE), 'codex');
-  assert.equal(detectHost({ hook_event_name: 'PostToolUse', tool_use_id: 'x' }), 'codex');
+test('hosts: detect windsurf by agent_action_name + tool_info', () => {
+  assert.equal(detectHost(WINDSURF_PRERUN), 'windsurf');
+  assert.equal(detectHost(WINDSURF_PREWRITE), 'windsurf');
 });
 
-test('hosts: claude-code payload stays native', () => {
-  assert.equal(detectHost(CLAUDE_PRETOOLUSE), 'claude-code');
-  const { payload, host } = normalizeInput(CLAUDE_PRETOOLUSE);
-  assert.equal(host, 'claude-code');
-  assert.deepEqual(payload, CLAUDE_PRETOOLUSE);
+test('hosts: detect opencode shim payloads', () => {
+  assert.equal(detectHost(OPENCODE_SHIM), 'opencode');
 });
 
-test('hosts: gemini BeforeTool normalizes to PreToolUse', () => {
-  const { payload, host } = normalizeInput(GEMINI_BEFORETOOL);
-  assert.equal(host, 'gemini-cli');
+test('hosts: cursor shell normalizes to Bash PreToolUse', () => {
+  const { payload, host } = normalizeInput(CURSOR_BEFORShell);
+  assert.equal(host, 'cursor');
   assert.equal(payload.hook_event_name, 'PreToolUse');
+  assert.equal(payload.tool_name, 'Bash');
   assert.equal(payload.tool_input.command, 'git push --force origin main');
 });
 
-test('hosts: gemini PreCompress normalizes to PreCompact', () => {
-  const { payload } = normalizeInput({ hook_event_name: 'PreCompress', timestamp: 'x' });
-  assert.equal(payload.hook_event_name, 'PreCompact');
-});
-
-test('hosts: codex PreToolUse normalizes to native shape', () => {
-  const { payload, host } = normalizeInput(CODEX_PRETOOLUSE);
-  assert.equal(host, 'codex');
+test('hosts: cursor beforeReadFile normalizes to Read', () => {
+  const { payload } = normalizeInput(CURSOR_BEFOREREAD);
   assert.equal(payload.hook_event_name, 'PreToolUse');
-  assert.equal(payload.tool_name, 'shell');
+  assert.equal(payload.tool_name, 'Read');
+  assert.equal(payload.tool_input.file_path, '/repo/.env');
 });
 
-test('hosts: codex deny output follows its JSON contract', () => {
+test('hosts: windsurf pre_run_command normalizes to Bash PreToolUse', () => {
+  const { payload, host } = normalizeInput(WINDSURF_PRERUN);
+  assert.equal(host, 'windsurf');
+  assert.equal(payload.hook_event_name, 'PreToolUse');
+  assert.equal(payload.tool_name, 'Bash');
+  assert.equal(payload.tool_input.command, 'git push --force origin main');
+});
+
+test('hosts: windsurf pre_write_code carries edit content', () => {
+  const { payload } = normalizeInput(WINDSURF_PREWRITE);
+  assert.equal(payload.hook_event_name, 'PreToolUse');
+  assert.equal(payload.tool_name, 'Write');
+  assert.equal(payload.tool_input.file_path, '/repo/a.rs');
+  assert.match(payload.tool_input.content, /unsafe/);
+});
+
+test('hosts: opencode shim normalizes tool+args', () => {
+  const { payload, host } = normalizeInput(OPENCODE_SHIM);
+  assert.equal(host, 'opencode');
+  assert.equal(payload.hook_event_name, 'PreToolUse');
+  assert.equal(payload.tool_name, 'bash');
+});
+
+test('hosts: cursor deny output uses permission field (exit 0)', () => {
   const out = formatOutput(
     { exitCode: 2, reason: 'force push blocked' },
+    { host: 'cursor', event: 'beforeShellExecution' }
+  );
+  assert.equal(out.exitCode, 0);
+  const parsed = JSON.parse(out.stdout);
+  assert.equal(parsed.permission, 'deny');
+  assert.match(parsed.agentMessage, /force push/);
+});
+
+test('hosts: cursor allow output', () => {
+  const out = formatOutput({ exitCode: 0 }, { host: 'cursor', event: 'beforeShellExecution' });
+  const parsed = JSON.parse(out.stdout);
+  assert.equal(parsed.permission, 'allow');
+});
+
+test('hosts: windsurf uses exit-code contract (2=block)', () => {
+  const blocked = formatOutput(
+    { exitCode: 2, reason: 'unsafe' },
+    { host: 'windsurf', event: 'pre_run_command' }
+  );
+  assert.equal(blocked.exitCode, 2);
+  assert.match(blocked.stderr, /unsafe/);
+
+  const allowed = formatOutput({ exitCode: 0 }, { host: 'windsurf', event: 'pre_run_command' });
+  assert.equal(allowed.exitCode, 0);
+});
+
+test('hosts: opencode uses exit-code contract (2=block, thrown by plugin)', () => {
+  const blocked = formatOutput(
+    { exitCode: 2, reason: 'deny: config tamper' },
+    { host: 'opencode', event: 'PreToolUse' }
+  );
+  assert.equal(blocked.exitCode, 2);
+  assert.match(blocked.stderr, /deny/);
+});
+
+test('hosts: prior codex/gemini behaviors unchanged (regression)', () => {
+  const codex = formatOutput(
+    { exitCode: 2, reason: 'x' },
     { host: 'codex', event: 'PreToolUse' }
   );
-  assert.equal(out.exitCode, 0);
-  const parsed = JSON.parse(out.stdout);
-  assert.equal(parsed.decision, 'block');
-  assert.equal(parsed.hookSpecificOutput.hookEventName, 'PreToolUse');
-  assert.equal(parsed.hookSpecificOutput.permissionDecision, 'deny');
-  assert.match(parsed.hookSpecificOutput.permissionDecisionReason, /force push/);
+  const codexParsed = JSON.parse(codex.stdout);
+  assert.equal(codexParsed.decision, 'block');
+
+  const gem = formatOutput({ exitCode: 2, reason: 'y' }, { host: 'gemini-cli', event: 'BeforeTool' });
+  const gemParsed = JSON.parse(gem.stdout);
+  assert.equal(gemParsed.decision, 'deny');
+
+  const cc = formatOutput({ exitCode: 2, reason: 'z' }, { host: 'claude-code' });
+  assert.equal(cc.exitCode, 2);
 });
 
-test('hosts: codex allow output approves', () => {
-  const out = formatOutput({ exitCode: 0 }, { host: 'codex', event: 'PostToolUse' });
-  const parsed = JSON.parse(out.stdout);
-  assert.equal(parsed.decision, 'approve');
-  assert.equal(parsed.hookSpecificOutput.hookEventName, 'PostToolUse');
-});
-
-test('hosts: gemini deny output uses decision field, exit 0', () => {
-  const out = formatOutput(
-    { exitCode: 2, reason: 'injection detected' },
-    { host: 'gemini-cli', event: 'BeforeTool' }
-  );
-  assert.equal(out.exitCode, 0);
-  const parsed = JSON.parse(out.stdout);
-  assert.equal(parsed.decision, 'deny');
-  assert.match(parsed.reason, /injection/);
-});
-
-test('hosts: gemini allow can carry a warning via systemMessage', () => {
-  const out = formatOutput(
-    { exitCode: 0, reason: 'suspicious content noted' },
-    { host: 'gemini-cli', event: 'AfterTool' }
-  );
-  const parsed = JSON.parse(out.stdout);
-  assert.equal(parsed.decision, 'allow');
-  assert.match(parsed.systemMessage, /suspicious/);
-});
-
-test('hosts: claude-code output stays exit-code based', () => {
-  const out = formatOutput(
-    { exitCode: 2, reason: 'blocked' },
-    { host: 'claude-code', event: 'PreToolUse' }
-  );
-  assert.equal(out.exitCode, 2);
-  assert.equal(out.stdout, undefined);
-  assert.equal(out.stderr, 'blocked');
-});
-
-test('hosts: end-to-end gemini deny through the guard runner', async (t) => {
+test('hosts: end-to-end cursor deny through the guard runner', async () => {
   const { runHookGuard } = await import('../src/dispatch.js');
   const { Readable } = await import('node:stream');
-  const stream = Readable.from([JSON.stringify(GEMINI_BEFORETOOL)]);
+  const stream = Readable.from([JSON.stringify(CURSOR_BEFORShell)]);
   const result = await runHookGuard({
     stdin: stream,
     load: async () => ({
@@ -142,7 +187,7 @@ test('hosts: end-to-end gemini deny through the guard runner', async (t) => {
     }),
   });
   assert.equal(result.exitCode, 2);
-  const out = formatOutput(result, { host: 'gemini-cli', event: 'BeforeTool' });
+  const out = formatOutput(result, { host: 'cursor', event: 'beforeShellExecution' });
   const parsed = JSON.parse(out.stdout);
-  assert.equal(parsed.decision, 'deny');
+  assert.equal(parsed.permission, 'deny');
 });

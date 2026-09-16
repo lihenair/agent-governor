@@ -1,4 +1,5 @@
 import { loadConfig, resolveProjectRoot } from './config.js';
+import { normalizeInput } from './hosts.js';
 import { evaluatePostToolUse } from './post-tool-use.js';
 import { evaluatePreToolUse } from './pre-tool-use.js';
 import { evaluateReadScan } from './read-guard.js';
@@ -23,7 +24,8 @@ export async function evaluateHook(payload, config, projectRoot, io) {
 }
 
 export async function runHookGuard({ stdin = process.stdin, load = loadConfig, io, payloadOverride } = {}) {
-  const payload = payloadOverride !== undefined ? payloadOverride : await readStdin(stdin);
+  const raw = payloadOverride !== undefined ? payloadOverride : await readStdin(stdin);
+  const { payload } = normalizeInput(raw);
   const projectRoot = resolveProjectRoot(payload);
   const config = await load(projectRoot);
   const started = Date.now();
