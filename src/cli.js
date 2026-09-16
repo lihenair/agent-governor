@@ -114,7 +114,7 @@ function parseFlags(argv) {
     const arg = argv[index];
     if (arg === '--json') {
       flags.json = true;
-    } else if (arg === '--command' || arg === '--file' || arg === '--operation' || arg === '--config' || arg === '--event' || arg === '--tail') {
+    } else if (arg === '--command' || arg === '--file' || arg === '--operation' || arg === '--config' || arg === '--event' || arg === '--tail' || arg === '--engine') {
       flags[arg.slice(2)] = argv[index + 1];
       index += 1;
     } else {
@@ -186,6 +186,9 @@ export async function runCli(argv = process.argv.slice(2)) {
       const flags = parseFlags(argv.slice(1));
       const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
       const config = await loadConfig(projectRoot);
+      if (flags.engine) {
+        config.engine = flags.engine; // per-invocation override for A/B demos
+      }
       const report = runDryTest(flags, { config, projectRoot });
       process.stdout.write(formatTestReport(report, { json: Boolean(flags.json) }));
       exitAllow();

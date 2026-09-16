@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-09-16
+
+### Fixed
+
+- **`governor test --file X --operation write` never ran source-policy
+  checks**: the dry-run payload carried empty content, so every
+  source-policy rule silently passed. Content is now seeded from disk when
+  the file exists. (Found while verifying the marketing repro script.)
+
+### Added
+
+- `governor test --engine ast-grep` flag for per-invocation engine A/B
+  (demo-friendly: same input, regex flags / ast-grep allows).
+
 ## [0.6.1] - 2026-09-16
 
 ### Changed

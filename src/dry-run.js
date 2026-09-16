@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { compilePreToolPolicy } from './policy/rules.js';
 import { evaluatePreToolUse } from './pre-tool-use.js';
@@ -33,7 +34,15 @@ export function payloadFromTestFlags(flags, projectRoot) {
   const operation = flags.operation || 'modify';
   const abs = path.isAbsolute(flags.file) ? flags.file : path.resolve(projectRoot, flags.file);
   if (operation === 'write' || operation === 'create') {
-    return { tool_name: 'Write', tool_input: { file_path: abs, content: '' } };
+    // Seed content from disk when the file exists, so source-policy rules
+    // have something real to inspect (empty content always passes).
+    let content = '';
+    try {
+      content = fs.readFileSync(abs, 'utf8');
+    } catch {
+      content = '';
+    }
+    return { tool_name: 'Write', tool_input: { file_path: abs, content } };
   }
   return {
     tool_name: 'Edit',
