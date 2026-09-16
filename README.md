@@ -4,7 +4,7 @@
 
 **Deterministic Runtime Guardrails for Claude Code, Codex CLI & Gemini CLI**
 
-*Syntax-tree code checks, read-side prompt-injection scanning, and hardware-grade hooks — one config, three coding agents.*
+*Syntax-tree code checks, read-side prompt-injection scanning, and hardware-grade hooks — one config, six coding agents.*
 
 [English](./README.md) | [简体中文](./README_ZH.md)
 
@@ -82,6 +82,9 @@ Host support and protocol details: [docs/hosts.md](./docs/hosts.md).
 | **Claude Code** | PreToolUse, PostToolUse, SessionStart, PreCompact | exit `2` + stderr reason |
 | **OpenAI Codex CLI** | PreToolUse, PostToolUse, SessionStart, PreCompact | stdout JSON `decision: "block"` + `permissionDecision` |
 | **Google Gemini CLI** | BeforeTool, AfterTool, SessionStart, PreCompress | stdout JSON `{ decision: "deny" }` |
+| **Cursor** | beforeShellExecution, beforeEditFile, beforeReadFile, beforeMCPExecution, afterFileEdit, afterShellExecution | stdout JSON `{ permission: "deny", agentMessage }` |
+| **Windsurf (Cascade)** | pre_run_command, pre_write_code, pre_read_code, post_run_command, post_write_code | exit `2` + stderr reason |
+| **OpenCode** | tool.execute.before, tool.execute.after (plugin) | plugin throws → reason surfaced to model |
 
 Fail-open on internal errors (a governor bug must not freeze the agent loop), fail-closed on policy violations. Honest scope: guardrails stop *accidental* damage, not a determined adversary — for that, add OS-level sandboxing (see [SECURITY.md](./SECURITY.md)).
 
@@ -136,7 +139,7 @@ npx agent-governor doctor
 # → all checks passed (runtime, config, hooks, audit, live deny dry-run)
 ```
 
-**Codex CLI / Gemini CLI setup:** see [docs/hosts.md](./docs/hosts.md) — adapter hook configs ship in the npm package (`adapters/`).
+**Codex CLI / Gemini CLI / Cursor / Windsurf / OpenCode setup:** see [docs/hosts.md](./docs/hosts.md) — adapter configs and the OpenCode plugin ship in the npm package (`adapters/`).
 
 ---
 

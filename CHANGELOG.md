@@ -32,6 +32,11 @@ Claude Code · OpenAI Codex CLI · Google Gemini CLI · Cursor · Windsurf
 
 ## [0.6.2] - 2026-09-16
 
+### Docs
+
+- README.md / README_ZH.md rewritten to match v0.6 reality: capability
+  comparison table, all 14 CLI commands, honest scope, real perf numbers.
+
 ### Fixed
 
 - **`governor test --file X --operation write` never ran source-policy

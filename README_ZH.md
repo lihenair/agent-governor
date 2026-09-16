@@ -4,7 +4,7 @@
 
 **面向 Claude Code、Codex CLI 与 Gemini CLI 的确定性运行时护栏**
 
-*语法树级代码检查、读取侧提示注入扫描、硬件级 Hook——一份配置，守护三个编程 Agent。*
+*语法树级代码检查、读取侧提示注入扫描、硬件级 Hook——一份配置，守护六个编程 Agent。*
 
 [English](./README.md) | [简体中文](./README_ZH.md)
 
@@ -60,7 +60,7 @@ AI 编程 Agent 很快，但存在**非确定性与上下文漂移**：
 
 ## 🏗️ 工作原理
 
-Agent Governor 挂接各宿主的原生 Hook 运行时（Claude Code 的 `PreToolUse`/`PostToolUse`/`SessionStart`/`PreCompact`；Codex CLI 与 Gemini CLI 的对应事件）。载荷自动识别、归一化，决定按宿主原生协议输出。
+Agent Governor 挂接各宿主的原生 Hook 运行时（Claude Code、Codex CLI、Gemini CLI、Cursor、Windsurf、OpenCode）。载荷自动识别、归一化，决定按宿主原生协议输出。
 
 ```
 ┌─────────────────┐      Tool Request       ┌──────────────────────────┐
@@ -82,6 +82,9 @@ Agent Governor 挂接各宿主的原生 Hook 运行时（Claude Code 的 `PreToo
 | **Claude Code** | PreToolUse, PostToolUse, SessionStart, PreCompact | exit `2` + stderr 原因 |
 | **OpenAI Codex CLI** | PreToolUse, PostToolUse, SessionStart, PreCompact | stdout JSON `decision: "block"` + `permissionDecision` |
 | **Google Gemini CLI** | BeforeTool, AfterTool, SessionStart, PreCompress | stdout JSON `{ decision: "deny" }` |
+| **Cursor** | beforeShellExecution, beforeEditFile, beforeReadFile, beforeMCPExecution, afterFileEdit, afterShellExecution | stdout JSON `{ permission: "deny", agentMessage }` |
+| **Windsurf (Cascade)** | pre_run_command, pre_write_code, pre_read_code, post_run_command, post_write_code | exit `2` + stderr 原因 |
+| **OpenCode** | tool.execute.before, tool.execute.after（插件） | 插件抛错 → 原因回显给模型 |
 
 内部错误 fail-open（governor 崩了不能卡死 Agent 循环），策略违规 fail-closed。诚实边界：护栏拦的是*意外事故*，不是蓄意对抗——对抗场景请叠加 OS 级沙箱（见 [SECURITY.md](./SECURITY.md)）。
 
@@ -136,7 +139,7 @@ npx agent-governor doctor
 # → all checks passed（运行时、配置、Hook、审计、实弹拦截演练）
 ```
 
-**Codex CLI / Gemini CLI 配置：** 见 [docs/hosts.md](./docs/hosts.md)——适配器 Hook 配置随 npm 包分发（`adapters/` 目录）。
+**Codex CLI / Gemini CLI / Cursor / Windsurf / OpenCode 配置：** 见 [docs/hosts.md](./docs/hosts.md)——适配器配置与 OpenCode 插件随 npm 包分发（`adapters/` 目录）。
 
 ---
 
