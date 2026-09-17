@@ -10,27 +10,29 @@ function hit(file, code, config = regexCfg) {
   return inspectSource(file, code, config);
 }
 
-describe('alias-class evasions (current engines)', () => {
-  it('Python AST still misses getattr(__builtins__, "eval")', () => {
-    assert.deepEqual(hit('app.py', 'getattr(__builtins__, "eval")(x)'), []);
+describe('alias-class evasions', () => {
+  it('Python AST flags getattr(__builtins__, "eval")', () => {
+    const errors = hit('app.py', 'getattr(__builtins__, "eval")(x)');
+    assert.ok(errors.length >= 1);
+    assert.match(errors.join(' '), /eval/);
   });
 
-  it('Java misses Runtime.exec after a local alias (regex and ast-grep)', () => {
+  it('Java flags Runtime.exec after a local alias (regex and ast-grep)', () => {
     const code = 'Runtime rt = Runtime.getRuntime();\nrt.exec("rm");';
-    assert.deepEqual(hit('a.java', code, regexCfg), []);
-    assert.deepEqual(hit('a.java', code, astCfg), []);
+    assert.ok(hit('a.java', code, regexCfg).length >= 1);
+    assert.ok(hit('a.java', code, astCfg).length >= 1);
   });
 
-  it('C misses gets via function pointer (regex and ast-grep)', () => {
+  it('C still misses gets via function pointer (regex and ast-grep)', () => {
     const code = 'char *(*p)(char *) = gets;\np(buf);';
     assert.deepEqual(hit('a.c', code, regexCfg), []);
     assert.deepEqual(hit('a.c', code, astCfg), []);
   });
 
-  it('C++ std::system is flagged by regex but missed by ast-grep callee text', () => {
+  it('C++ std::system is flagged by regex and ast-grep', () => {
     const code = 'std::system("ls");';
     assert.ok(hit('a.cpp', code, regexCfg).length >= 1);
-    assert.deepEqual(hit('a.cpp', code, astCfg), []);
+    assert.ok(hit('a.cpp', code, astCfg).length >= 1);
   });
 
   it('Kotlin misses aliased TODO() (regex and ast-grep)', () => {

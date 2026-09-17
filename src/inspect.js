@@ -56,6 +56,61 @@ function hasJsx(ast) {
   return found;
 }
 
+const BANNED_JS_GLOBALS = new Set(['eval', 'Function']);
+
+function unwrapExpr(node) {
+  while (node) {
+    if (
+      node.type === 'ParenthesizedExpression' ||
+      node.type === 'TSAsExpression' ||
+      node.type === 'TSTypeAssertion' ||
+      node.type === 'TSNonNullExpression'
+    ) {
+      node = node.expression;
+      continue;
+    }
+    if (node.type === 'SequenceExpression' && node.expressions?.length) {
+      node = node.expressions[node.expressions.length - 1];
+      continue;
+    }
+    break;
+  }
+  return node;
+}
+
+function bannedJsGlobal(node, aliases) {
+  node = unwrapExpr(node);
+  if (!node) {
+    return null;
+  }
+  if (node.type === 'Identifier') {
+    if (BANNED_JS_GLOBALS.has(node.name)) {
+      return node.name;
+    }
+    return aliases.get(node.name) || null;
+  }
+  if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+    const prop = node.property;
+    if (!node.computed && prop?.type === 'Identifier' && BANNED_JS_GLOBALS.has(prop.name)) {
+      return prop.name;
+    }
+    if (node.computed && prop?.type === 'StringLiteral' && BANNED_JS_GLOBALS.has(prop.value)) {
+      return prop.value;
+    }
+  }
+  return null;
+}
+
+function recordJsAlias(aliases, id, init) {
+  if (id?.type !== 'Identifier' || !init) {
+    return;
+  }
+  const banned = bannedJsGlobal(init, aliases);
+  if (banned) {
+    aliases.set(id.name, banned);
+  }
+}
+
 export function inspectJavaScript(filePath, code, config = CONFIG) {
   const errors = [];
   const ext = path.extname(filePath);
@@ -76,37 +131,40 @@ export function inspectJavaScript(filePath, code, config = CONFIG) {
   }
 
   const astRules = config.astRules || {};
+  const aliases = new Map();
+
+  function flagEvalLike(node) {
+    const line = node.loc?.start.line ?? '?';
+    const name = bannedJsGlobal(node.callee, aliases);
+    if (name === 'eval' && astRules.noDirectEval !== false) {
+      errors.push(`Line ${line}: Direct 'eval()' usage is strictly forbidden.`);
+    }
+    if (name === 'Function' && astRules.noNewFunction) {
+      errors.push(`Line ${line}: 'new Function()' is a dynamic eval equivalent and is forbidden.`);
+    }
+    if (Array.isArray(astRules.forbiddenCallNames)) {
+      const callee = unwrapExpr(node.callee);
+      if (callee?.type === 'Identifier' && astRules.forbiddenCallNames.includes(callee.name)) {
+        errors.push(`Line ${line}: Call to forbidden function '${callee.name}()' is not allowed.`);
+      }
+    }
+  }
 
   defaultTraverse(ast, {
-    CallExpression(pathNode) {
-      const callee = pathNode.node.callee;
-      const line = pathNode.node.loc?.start.line ?? '?';
-
-      if (
-        astRules.noDirectEval !== false &&
-        callee.type === 'Identifier' &&
-        callee.name === 'eval'
-      ) {
-        errors.push(`Line ${line}: Direct 'eval()' usage is strictly forbidden.`);
-      }
-
-      if (Array.isArray(astRules.forbiddenCallNames)) {
-        if (callee.type === 'Identifier' && astRules.forbiddenCallNames.includes(callee.name)) {
-          errors.push(`Line ${line}: Call to forbidden function '${callee.name}()' is not allowed.`);
-        }
-      }
+    VariableDeclarator(pathNode) {
+      recordJsAlias(aliases, pathNode.node.id, pathNode.node.init);
     },
-
+    AssignmentExpression(pathNode) {
+      recordJsAlias(aliases, pathNode.node.left, pathNode.node.right);
+    },
+    CallExpression(pathNode) {
+      flagEvalLike(pathNode.node);
+    },
+    OptionalCallExpression(pathNode) {
+      flagEvalLike(pathNode.node);
+    },
     NewExpression(pathNode) {
-      const callee = pathNode.node.callee;
-      const line = pathNode.node.loc?.start.line ?? '?';
-      if (
-        astRules.noNewFunction &&
-        callee.type === 'Identifier' &&
-        callee.name === 'Function'
-      ) {
-        errors.push(`Line ${line}: 'new Function()' is a dynamic eval equivalent and is forbidden.`);
-      }
+      flagEvalLike(pathNode.node);
     },
 
     Identifier(pathNode) {
@@ -283,15 +341,49 @@ export function inspectCpp(filePath, code, config = CONFIG) {
   ];
 }
 
+function lineNumberAt(code, index) {
+  return code.slice(0, index).split(/\r?\n/).length;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function inspectJava(filePath, code, config = CONFIG) {
   if (config.astRules?.javaForbidRuntimeExec === false) {
     return [];
   }
-  return matchLines(
-    stripCLikeComments(code),
-    /Runtime\.getRuntime\(\)\s*\.exec\s*\(/,
-    "Java Runtime.exec() is forbidden in agent-authored code."
-  );
+  const scanned = stripCLikeComments(code);
+  const message = 'Java Runtime.exec() is forbidden in agent-authored code.';
+  const errors = [];
+  const seen = new Set();
+  const pushAt = (index) => {
+    const line = lineNumberAt(scanned, index);
+    const entry = `Line ${line}: ${message}`;
+    if (!seen.has(entry)) {
+      seen.add(entry);
+      errors.push(entry);
+    }
+  };
+
+  const direct = /Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(/g;
+  let match;
+  while ((match = direct.exec(scanned))) {
+    pushAt(match.index);
+  }
+
+  const runtimeVars = new Set();
+  const assigned = /(?:Runtime\s+)?(\w+)\s*=\s*Runtime\.getRuntime\s*\(\s*\)/g;
+  while ((match = assigned.exec(scanned))) {
+    runtimeVars.add(match[1]);
+  }
+  for (const name of runtimeVars) {
+    const call = new RegExp(`\\b${escapeRegExp(name)}\\.exec\\s*\\(`, 'g');
+    while ((match = call.exec(scanned))) {
+      pushAt(match.index);
+    }
+  }
+  return errors;
 }
 
 export function languageIdFor(filePath) {

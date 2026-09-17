@@ -77,6 +77,24 @@ class Checker(ast.NodeVisitor):
                         "message": f"Computed lookup of banned '{sl.value}()' is forbidden.",
                     }
                 )
+        elif isinstance(func, ast.Call):
+            # getattr(__builtins__, "eval")(x)
+            inner = func.func
+            if (
+                isinstance(inner, ast.Name)
+                and inner.id == "getattr"
+                and len(func.args) >= 2
+                and isinstance(func.args[1], ast.Constant)
+                and isinstance(func.args[1].value, str)
+                and func.args[1].value in self.banned_calls
+            ):
+                banned = func.args[1].value
+                self.issues.append(
+                    {
+                        "lineno": node.lineno,
+                        "message": f"getattr(..., '{banned}') aliases banned '{banned}()'; use is forbidden.",
+                    }
+                )
 
     def visit_Call(self, node):
         self._check_call_target(node)

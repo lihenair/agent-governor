@@ -7,10 +7,16 @@ function flags(code) {
   return inspectAST('/repo/src/a.ts', code, CONFIG);
 }
 
-describe('JS eval aliases (current Babel walk)', () => {
-  it('still flags direct eval() and new Function()', () => {
-    assert.match(flags('eval(code);')[0], /eval\(\)/);
-    assert.match(flags('new Function("return 1");')[0], /new Function/);
+function flagged(code) {
+  const errors = flags(code);
+  assert.ok(errors.length >= 1, `expected a hit for ${JSON.stringify(code)}, got ${JSON.stringify(errors)}`);
+  return errors;
+}
+
+describe('JS eval aliases (Babel walk)', () => {
+  it('flags direct eval() and new Function()', () => {
+    assert.match(flagged('eval(code);')[0], /eval\(\)/);
+    assert.match(flagged('new Function("return 1");')[0], /new Function/);
   });
 
   it('does not false-positive on strings or comments', () => {
@@ -18,26 +24,27 @@ describe('JS eval aliases (current Babel walk)', () => {
     assert.deepEqual(flags('// eval(x)\nconst x = 1;'), []);
   });
 
-  it('misses aliased eval (Python AST catches this shape)', () => {
-    assert.deepEqual(flags('const e = eval;\ne(code);'), []);
-    assert.deepEqual(flags('var e = eval; e(x);'), []);
+  it('flags aliased eval', () => {
+    assert.match(flagged('const e = eval;\ne(code);').join('\n'), /eval/);
+    assert.match(flagged('var e = eval; e(x);').join('\n'), /eval/);
   });
 
-  it('misses member and computed eval', () => {
-    assert.deepEqual(flags('window.eval(code);'), []);
-    assert.deepEqual(flags('globalThis.eval(code);'), []);
-    assert.deepEqual(flags('window["eval"](code);'), []);
-    assert.deepEqual(flags('globalThis["eval"](code);'), []);
+  it('flags member and computed eval', () => {
+    assert.match(flagged('window.eval(code);').join('\n'), /eval/);
+    assert.match(flagged('globalThis.eval(code);').join('\n'), /eval/);
+    assert.match(flagged('window["eval"](code);').join('\n'), /eval/);
+    assert.match(flagged('globalThis["eval"](code);').join('\n'), /eval/);
   });
 
-  it('misses indirect eval and optional call', () => {
-    assert.deepEqual(flags('(0, eval)(code);'), []);
-    assert.deepEqual(flags('eval?.(code);'), []);
+  it('flags indirect eval and optional call', () => {
+    assert.match(flagged('(0, eval)(code);').join('\n'), /eval/);
+    assert.match(flagged('eval?.(code);').join('\n'), /eval/);
   });
 
-  it('misses aliased / member new Function()', () => {
-    assert.deepEqual(flags('const F = Function;\nnew F("return 1");'), []);
-    assert.deepEqual(flags('new window.Function("return 1");'), []);
-    assert.deepEqual(flags('new window["Function"]("return 1");'), []);
+  it('flags aliased / member Function', () => {
+    assert.match(flagged('const F = Function;\nnew F("return 1");').join('\n'), /Function/);
+    assert.match(flagged('new window.Function("return 1");').join('\n'), /Function/);
+    assert.match(flagged('new window["Function"]("return 1");').join('\n'), /Function/);
+    assert.match(flagged('Function("return 1");').join('\n'), /Function/);
   });
 });
