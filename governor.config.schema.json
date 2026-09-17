@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lihenair/agent-governor/governor.config.schema.json",
+  "title": "agent-governor config",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "protectedFiles": { "type": "array", "items": { "type": "string" } },
+    "protectedDirectories": { "type": "array", "items": { "type": "string" } },
+    "codeExtensions": { "type": "array", "items": { "type": "string" } },
+    "forbiddenBashPatterns": {
+      "type": "array",
+      "items": { "type": ["string", "object"] }
+    },
+    "unprotect": { "type": "array", "items": { "type": "string" } },
+    "override": { "type": "boolean" },
+    "failureMode": { "type": "string", "enum": ["open", "closed"] },
+    "preset": { "type": ["string", "array"] },
+    "rulebooks": { "type": "array", "items": { "type": "string" } },
+    "injectionMode": { "type": "string", "enum": ["scan", "off"] },
+    "injectionPatterns": { "type": "array" },
+    "engine": { "type": "string", "enum": ["regex", "ast-grep"] },
+    "astRules": { "type": "object" }
+  }
+}

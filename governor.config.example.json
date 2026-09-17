@@ -48,6 +48,7 @@
     "cppForbidUnsafeC": true,
     "javaForbidRuntimeExec": true
   },
+  "failureMode": "open",
   "rulebooks": [
     "terraform",
     "aws"

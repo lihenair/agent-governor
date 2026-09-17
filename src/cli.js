@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG, loadConfig, mergeConfig } from './config.js';
+import { formatValidationErrors, validateGovernorConfig } from './config-validate.js';
 import { explainConfig, formatTestReport, runDryTest } from './dry-run.js';
 import { initProject, parseLangFlag } from './init.js';
 import { runHookGuard } from './dispatch.js';
@@ -58,6 +59,8 @@ Commands:
   explain "git reset --hard" | explain path/to/file
                Explain what the governor would do with one target, and why
   report       Summarize the audit log: blocks, top rules, last intervention
+  validate [--config path]
+               Check governor.config.json (file, field path, reason on errors)
   doctor       Self-check runtime, config, hooks, audit state; exit 1 on failure
   status       Show active policy and local-vs-committed drift; exit 1 on drift
   rule list    List installed rulebooks (additive policy packs)
@@ -222,6 +225,31 @@ export async function runCli(argv = process.argv.slice(2)) {
       // explain --config — dump the compiled rule set (original behavior).
       const config = await loadExplainConfig(flags.config);
       process.stdout.write(explainConfig(config));
+      exitAllow();
+      break;
+    }
+    case 'validate': {
+      const flags = parseFlags(argv.slice(1));
+      const configPath = flags.config
+        ? path.resolve(flags.config)
+        : path.join(process.cwd(), 'governor.config.json');
+      if (!fs.existsSync(configPath)) {
+        process.stderr.write(`${configPath}: (root) — file not found\n`);
+        process.exit(1);
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      } catch (err) {
+        process.stderr.write(`${configPath}: (root) — invalid JSON (${err.message})\n`);
+        process.exit(1);
+      }
+      const result = validateGovernorConfig(parsed, configPath);
+      if (!result.ok) {
+        process.stderr.write(`${formatValidationErrors(result.errors)}\n`);
+        process.exit(1);
+      }
+      process.stdout.write(`[Agent Governor] ${configPath} is valid\n`);
       exitAllow();
       break;
     }

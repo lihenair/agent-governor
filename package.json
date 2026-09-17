@@ -23,6 +23,7 @@
     ".claude-plugin",
     "rulebooks",
     "governor.config.example.json",
+    "governor.config.schema.json",
     "README.md",
     "README_ZH.md",
     "CHANGELOG.md",

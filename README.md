@@ -164,6 +164,7 @@ npx agent-governor explain --config governor.config.json   # dump compiled rules
 npx agent-governor doctor                # self-check (exit 1 on failure)
 npx agent-governor status                # policy + drift vs committed baseline (exit 1 on drift)
 npx agent-governor report [--json]       # audit digest
+npx agent-governor validate [--config path]  # schema check (file, field, reason)
 npx agent-governor rule list | rule add <name...>   # additive rulebook packs
 npx agent-governor version
 ```

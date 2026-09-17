@@ -112,6 +112,13 @@ export const CONFIG = {
   },
 
   /**
+   * Internal-error posture. `open` (default) warns and continues; `closed`
+   * exits 2 when self-hash verification fails. Audit logs record the mode
+   * actually used as `failure_mode`.
+   */
+  failureMode: 'open',
+
+  /**
    * Read-side prompt injection scanning on Read/WebFetch/WebSearch content.
    * 'scan' (default) = detect and block/ warn; 'off' = disable entirely.
    */

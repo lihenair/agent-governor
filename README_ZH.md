@@ -164,6 +164,8 @@ npx agent-governor explain --config governor.config.json   # 输出编译后的�
 npx agent-governor doctor                # 自检（失败 exit 1）
 npx agent-governor status                # 当前策略 + 与提交基线的漂移（漂移 exit 1）
 npx agent-governor report [--json]       # 审计摘要
+npx agent-governor validate [--config path]  # 配置校验（文件、字段路径、原因）
+npx agent-governor rule list | rule add <name...>   # 附加规则包
 npx agent-governor rule list | rule add <name...>   # 叠加式规则包
 npx agent-governor version
 ```
