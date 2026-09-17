@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-09-17
+
 ### Fixed
 
 - Published code no longer uses `child_process.execSync` (Socket "shell access").
