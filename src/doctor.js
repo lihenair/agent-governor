@@ -17,7 +17,7 @@ import path from 'node:path';
 import { loadConfig } from './config.js';
 import { compilePreToolPolicy } from './policy/rules.js';
 import { evaluatePreToolUse } from './pre-tool-use.js';
-import { getPreset, hasPreset } from './presets.js';
+import { AST_GREP_INSTALL, describeAstGrepRuntime } from './ast-grep-engine.js';
 
 const SETTINGS_CANDIDATES = ['.claude/settings.json', '.claude/settings.local.json'];
 
@@ -204,6 +204,40 @@ function checkGitRepo(projectRoot) {
   }
 }
 
+async function checkAstGrep(projectRoot) {
+  let engine = 'regex';
+  try {
+    const config = await loadConfig(projectRoot);
+    engine = config.engine || 'regex';
+  } catch {
+    engine = 'regex';
+  }
+  if (engine !== 'ast-grep') {
+    return {
+      id: 'ast-grep',
+      ok: true,
+      detail: 'engine=regex (native ast-grep not requested)',
+    };
+  }
+  const runtime = describeAstGrepRuntime();
+  if (!runtime.napi) {
+    return {
+      id: 'ast-grep',
+      ok: true,
+      warn: true,
+      detail: 'engine=ast-grep but @ast-grep/napi is not installed',
+      fix: AST_GREP_INSTALL,
+    };
+  }
+  const langs = runtime.langs.length > 0 ? runtime.langs.join(', ') : 'none (native langs use regex SOP)';
+  return {
+    id: 'ast-grep',
+    ok: true,
+    detail: `napi ready; lang packs: ${langs}`,
+    fix: runtime.langs.length === 0 ? AST_GREP_INSTALL : undefined,
+  };
+}
+
 /**
  * Run all doctor checks.
  *
@@ -219,6 +253,7 @@ export async function runDoctor(projectRoot = process.cwd()) {
     checkAuditWritable(projectRoot),
     await checkDenyWorks(projectRoot),
     checkGitRepo(projectRoot),
+    await checkAstGrep(projectRoot),
   ];
 
   const failed = checks.filter((check) => !check.ok);

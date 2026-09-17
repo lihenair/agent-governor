@@ -238,10 +238,17 @@ Persist with `"preset": "security-hard"` in `governor.config.json` (file wins ov
 | --- | --- | --- |
 | **Babel AST** (default) | JS/TS | Structural `eval` / `new Function` / custom calls |
 | **Python stdlib `ast`** (default) | Python | Aliases, attribute & computed lookups; regex fallback for syntax-error fragments |
-| **tree-sitter via ast-grep** (opt-in) | Rust, Go, Kotlin, Swift, C, C++, Dart | Strings/comments structurally immune to false positives; requires `@ast-grep/lang-*` packs (shipped as optionalDependencies, prebuilt) |
-| **Regex SOP** (default fallback) | all of the above | Zero-dependency heuristic; some false-positive risk on non-code text |
+| **tree-sitter via ast-grep** (opt-in) | Rust, Go, Kotlin, Swift, C, C++, Dart | Strings/comments structurally immune to false positives. **Not installed by default.** |
+| **Regex SOP** (default fallback) | native langs without ast-grep | Zero-dependency heuristic; some false-positive risk on non-code text |
 
-Set `"engine": "ast-grep"` to opt in; missing lang packs gracefully degrade that language to the regex SOP.
+Set `"engine": "ast-grep"` then install the native engine + the languages you use:
+
+```bash
+npm i -D @ast-grep/napi @ast-grep/lang-rust @ast-grep/lang-go
+# also: lang-kotlin lang-swift lang-c lang-cpp lang-java lang-dart
+```
+
+Missing packs degrade that language to the regex SOP. `npx agent-governor doctor` reports whether napi and lang packs are present.
 
 ### Field semantics
 

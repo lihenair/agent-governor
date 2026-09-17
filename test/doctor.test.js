@@ -76,6 +76,16 @@ test('doctor: unknown preset in config fails with available names', async (t) =>
   assert.match(config.fix, /security-hard/);
 });
 
+test('doctor: reports ast-grep install hint when engine is ast-grep', async (t) => {
+  const repo = tmpRepo(t);
+  fs.writeFileSync(path.join(repo, 'governor.config.json'), JSON.stringify({ engine: 'ast-grep' }));
+  const report = await runDoctor(repo);
+  const grep = report.checks.find((c) => c.id === 'ast-grep');
+  assert.ok(grep, 'missing ast-grep check');
+  assert.equal(grep.ok, true);
+  assert.match(grep.detail, /napi/);
+});
+
 test('doctor: report format is readable with icons and fixes', async (t) => {
   const repo = tmpRepo(t);
   const report = await runDoctor(repo);

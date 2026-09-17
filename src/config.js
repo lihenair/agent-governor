@@ -132,8 +132,9 @@ export const CONFIG = {
 
   /**
    * Source-check engine: 'regex' (default, zero native deps) or 'ast-grep'
-   * (tree-sitter structural checks for rust/go/kotlin/swift/java/c/cpp/dart,
-   * requires the @ast-grep/lang-* optional packages).
+   * (tree-sitter structural checks for rust/go/kotlin/swift/java/c/cpp/dart).
+   * ast-grep requires a user-installed `@ast-grep/napi` plus `@ast-grep/lang-*`
+   * packs; they are not pulled in by a default `npm i agent-governor`.
    */
   engine: 'regex',
 };

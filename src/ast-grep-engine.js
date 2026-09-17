@@ -4,8 +4,8 @@
  * Replaces the regex SOP layer for Rust / Go / Kotlin / Swift / Java / C/C++ /
  * Dart (and optionally Ruby/PHP/C# via future lang packs). Built-in napi
  * languages: Html, JavaScript, Tsx, Css, TypeScript. Everything else loads
- * through `@ast-grep/lang-<name>` optional dependencies — a missing pack
- * degrades that language back to the regex SOP instead of failing.
+ * through `@ast-grep/lang-<name>` packages the user installs on demand — a
+ * missing pack degrades that language back to the regex SOP instead of failing.
  *
  * Why a syntax tree beats line-regex for these languages (verified):
  *   - regex false-positives on strings/comments mentioning banned tokens
@@ -34,7 +34,7 @@ function loadSg() {
   return sgModule;
 }
 
-const LANG_PACKS = {
+export const LANG_PACKS = {
   rust: '@ast-grep/lang-rust',
   go: '@ast-grep/lang-go',
   kotlin: '@ast-grep/lang-kotlin',
@@ -44,6 +44,9 @@ const LANG_PACKS = {
   java: '@ast-grep/lang-java',
   dart: '@ast-grep/lang-dart',
 };
+
+export const AST_GREP_INSTALL =
+  'npm i -D @ast-grep/napi @ast-grep/lang-rust @ast-grep/lang-go @ast-grep/lang-kotlin @ast-grep/lang-swift @ast-grep/lang-c @ast-grep/lang-cpp @ast-grep/lang-java @ast-grep/lang-dart';
 
 const EXT_TO_LANG = {
   '.rs': 'rust',
@@ -70,7 +73,7 @@ let registerAttempted = false;
  *
  * napi contract: registerDynamicLanguage must be called exactly once, before
  * the first parse — later calls silently stop taking effect. So we eagerly
- * load every `@ast-grep/lang-*` optionalDependency that is present and
+ * load every `@ast-grep/lang-*` pack that is present and
  * register them together.
  */
 function ensureRegistered() {
@@ -121,6 +124,17 @@ export function astGrepSupports(filePath) {
     return false;
   }
   return registerLang(lang);
+}
+
+/**
+ * Runtime status for doctor / CLI. napi and lang packs are user-installed.
+ */
+export function describeAstGrepRuntime() {
+  const napi = Boolean(loadSg());
+  if (napi) {
+    ensureRegistered();
+  }
+  return { napi, langs: [...registeredLangs] };
 }
 
 /** tree-sitter node kinds that mean "call" per language. */

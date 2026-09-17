@@ -238,10 +238,17 @@ npx agent-governor explain --preset security-hard   # 预览会多保护哪些�
 | --- | --- | --- |
 | **Babel AST**（默认） | JS/TS | 结构化识别 `eval` / `new Function` / 自定义禁用调用 |
 | **Python 标准库 `ast`**（默认） | Python | 别名、属性与计算属性查找；语法错误片段降级正则兜底 |
-| **tree-sitter via ast-grep**（可选） | Rust, Go, Kotlin, Swift, C, C++, Dart | 字符串/注释结构性免疫误报；需要 `@ast-grep/lang-*` 包（随包 optionalDependencies，预编译） |
-| **正则 SOP**（默认兜底） | 以上全部 | 零依赖启发式；非代码文本有少量误报风险 |
+| **tree-sitter via ast-grep**（可选） | Rust, Go, Kotlin, Swift, C, C++, Dart | 字符串/注释结构性免疫误报。**默认不安装。** |
+| **正则 SOP**（默认兜底） | 未装 ast-grep 的 native 语言 | 零依赖启发式；非代码文本有少量误报风险 |
 
-`"engine": "ast-grep"` 即可启用；语言包缺失时该语言自动降级回正则 SOP。
+`"engine": "ast-grep"` 后按需安装 native 引擎和你用到的语言包：
+
+```bash
+npm i -D @ast-grep/napi @ast-grep/lang-rust @ast-grep/lang-go
+# 还有: lang-kotlin lang-swift lang-c lang-cpp lang-java lang-dart
+```
+
+语言包缺失时该语言自动降级回正则 SOP。`npx agent-governor doctor` 会报告 napi / 语言包是否装上。
 
 ### 字段语义
 
