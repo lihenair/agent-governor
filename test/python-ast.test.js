@@ -34,6 +34,12 @@ test('python-ast: computed lookup globals()["eval"] is caught (regex could not)'
   assert.match(errors.join(' '), /Computed lookup/);
 });
 
+test('python-ast: getattr(__builtins__, "eval") is caught', () => {
+  const errors = inspectPython('app.py', 'getattr(__builtins__, "eval")(x)', CONFIG);
+  assert.ok(errors.length >= 1);
+  assert.match(errors.join(' '), /eval/);
+});
+
 test('python-ast: deprecated import flagged', () => {
   const errors = inspectPython('app.py', 'import imp', CONFIG);
   assert.equal(errors.length, 1);

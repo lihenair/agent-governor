@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-09-17
+
+### Fixed
+
+- JS AST walk now flags aliased / member / computed / indirect `eval` and `Function`
+  (`const e = eval`, `window.eval`, `(0, eval)`, `eval?.()`, `new window.Function`).
+- Java `Runtime rt = Runtime.getRuntime(); rt.exec(...)` is denied (regex + ast-grep).
+- Python AST flags `getattr(__builtins__, "eval")(...)`.
+- ast-grep treats `std::system` as `system()`.
+
 ## [0.7.1] - 2026-09-17
 
 ### Changed

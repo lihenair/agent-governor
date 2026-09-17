@@ -178,6 +178,67 @@ function collectByText(node, regex, out, depth = 0) {
   for (const kid of kids) collectByText(kid, regex, out, depth + 1);
 }
 
+function cCalleeName(fn) {
+  if (!fn) {
+    return '';
+  }
+  if (fn.kind() === 'identifier') {
+    return fn.text();
+  }
+  if (fn.kind() === 'qualified_identifier' || fn.kind() === 'scoped_identifier') {
+    const ids = fn.children().filter((child) => child.kind() === 'identifier');
+    return ids.length > 0 ? ids[ids.length - 1].text() : fn.text();
+  }
+  if (fn.kind() === 'parenthesized_expression') {
+    const inner = fn.children().find((child) => child.kind() !== '(' && child.kind() !== ')');
+    return cCalleeName(inner);
+  }
+  return fn.text();
+}
+
+function isJavaGetRuntime(node) {
+  if (!node || node.kind() !== 'method_invocation') {
+    return false;
+  }
+  const names = node.children().filter((child) => child.kind() === 'identifier').map((child) => child.text());
+  return names.includes('Runtime') && names.includes('getRuntime');
+}
+
+function collectJavaRuntimeAliases(root) {
+  const vars = new Set();
+  const declarators = [];
+  collectKinds(root, ['variable_declarator'], declarators);
+  for (const declarator of declarators) {
+    const kids = declarator.children();
+    const id = kids.find((child) => child.kind() === 'identifier');
+    const init = kids.find((child) => child.kind() === 'method_invocation');
+    if (id && init && isJavaGetRuntime(init)) {
+      vars.add(id.text());
+    }
+  }
+  return vars;
+}
+
+function isJavaRuntimeExec(node, runtimeVars) {
+  if (!node || node.kind() !== 'method_invocation') {
+    return false;
+  }
+  const kids = node.children();
+  const idents = kids.filter((child) => child.kind() === 'identifier');
+  const method = idents[idents.length - 1];
+  if (!method || method.text() !== 'exec') {
+    return false;
+  }
+  const object = kids[0];
+  if (object && isJavaGetRuntime(object)) {
+    return true;
+  }
+  if (object && object.kind() === 'identifier' && runtimeVars.has(object.text())) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Structural checks for one file's source, via ast-grep syntax trees.
  *
@@ -265,24 +326,26 @@ export function inspectWithAstGrep(filePath, code, config = {}) {
     }
   }
 
-  // --- Java: forbid Runtime.getRuntime().exec
-  // NOTE: @ast-grep/lang-java 0.x 不被 napi 支持（"java is not supported"），
-  // 本分支实际到不了这里——java 的 langFor 命中后 registerLang 返回 false → null → 正则兜底。
+  // --- Java: forbid Runtime.getRuntime().exec and aliased rt.exec
   if (lang === 'java' && rules.javaForbidRuntimeExec !== false) {
+    const runtimeVars = collectJavaRuntimeAliases(root);
     const calls = [];
-    collectByText(root, /Runtime\s*\.\s*getRuntime\s*\(\s*\)\s*\.\s*exec/, calls);
-    if (calls.length > 0) {
-      errors.push('Line 1: Runtime.getRuntime().exec() is forbidden; use ProcessBuilder with a whitelist.');
+    collectKinds(root, CALL_KINDS.java, calls);
+    for (const call of calls) {
+      if (isJavaRuntimeExec(call, runtimeVars)) {
+        errors.push(
+          `Line ${call.range().start.line + 1}: Java Runtime.exec() is forbidden in agent-authored code.`
+        );
+      }
     }
   }
 
-  // --- C/C++: forbid gets() / system() calls
+  // --- C/C++: forbid gets() / system() calls (including std::system)
   if ((lang === 'c' || lang === 'cpp') && rules.cppForbidUnsafeC !== false) {
     const calls = [];
     collectKinds(root, CALL_KINDS[lang], calls);
     for (const call of calls) {
-      const fn = call.child(0);
-      const name = fn ? fn.text() : '';
+      const name = cCalleeName(call.child(0));
       if (name === 'gets') {
         errors.push(`Line ${call.range().start.line + 1}: C 'gets()' is unsafe and forbidden.`);
       } else if (name === 'system') {
