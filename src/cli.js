@@ -12,6 +12,7 @@ import { buildReport, formatReport } from './report.js';
 import { formatDoctorReport, runDoctor } from './doctor.js';
 import { buildStatus, formatStatus } from './status.js';
 import { explainTarget } from './explain.js';
+import { formatAudit, gcAudit, queryAudit } from './audit/query.js';
 import { formatOutput, normalizeInput } from './hosts.js';
 import { getPreset } from './presets.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
@@ -59,6 +60,10 @@ Commands:
   explain "git reset --hard" | explain path/to/file
                Explain what the governor would do with one target, and why
   report       Summarize the audit log: blocks, top rules, last intervention
+  audit [--since 24h] [--decision deny] [--rule id] [--session id] [--format table|json]
+               Query the JSONL audit log
+  audit gc --older-than 30d
+               Drop audit entries older than the duration
   validate [--config path]
                Check governor.config.json (file, field path, reason on errors)
   doctor       Self-check runtime, config, hooks, audit state; exit 1 on failure
@@ -125,7 +130,22 @@ function parseFlags(argv) {
     const arg = argv[index];
     if (arg === '--json') {
       flags.json = true;
-    } else if (arg === '--command' || arg === '--file' || arg === '--operation' || arg === '--config' || arg === '--event' || arg === '--tail' || arg === '--engine' || arg === '--preset') {
+    } else if (
+      arg === '--command' ||
+      arg === '--file' ||
+      arg === '--operation' ||
+      arg === '--config' ||
+      arg === '--event' ||
+      arg === '--tail' ||
+      arg === '--engine' ||
+      arg === '--preset' ||
+      arg === '--since' ||
+      arg === '--decision' ||
+      arg === '--rule' ||
+      arg === '--session' ||
+      arg === '--format' ||
+      arg === '--older-than'
+    ) {
       flags[arg.slice(2)] = argv[index + 1];
       index += 1;
     } else {
@@ -251,6 +271,43 @@ export async function runCli(argv = process.argv.slice(2)) {
       }
       process.stdout.write(`[Agent Governor] ${configPath} is valid\n`);
       exitAllow();
+      break;
+    }
+    case 'audit': {
+      const flags = parseFlags(argv.slice(1));
+      const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      if (flags._[0] === 'gc') {
+        const olderThan = flags['older-than'];
+        if (!olderThan) {
+          emitBlock('usage: agent-governor audit gc --older-than 30d');
+          process.exit(1);
+        }
+        try {
+          const result = gcAudit(projectRoot, { olderThan });
+          process.stdout.write(
+            `[Agent Governor] audit gc: removed ${result.removed}, kept ${result.kept}\n`
+          );
+          exitAllow();
+        } catch (err) {
+          emitBlock(`[Agent Governor] ${err.message}`);
+          process.exit(1);
+        }
+        break;
+      }
+      try {
+        const rows = queryAudit(projectRoot, {
+          since: flags.since,
+          decision: flags.decision,
+          rule: flags.rule,
+          session: flags.session,
+        });
+        const format = flags.format || (flags.json ? 'json' : 'table');
+        process.stdout.write(formatAudit(rows, format));
+        exitAllow();
+      } catch (err) {
+        emitBlock(`[Agent Governor] ${err.message}`);
+        process.exit(1);
+      }
       break;
     }
     case 'report': {
