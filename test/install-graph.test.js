@@ -54,11 +54,7 @@ describe('install graph (default npm i)', () => {
     }
   });
 
-  it('still ships Babel + shell-quote as the only runtime deps', () => {
-    assert.deepEqual(Object.keys(pkg.dependencies).sort(), [
-      '@babel/parser',
-      '@babel/traverse',
-      'shell-quote',
-    ]);
+  it('still ships @babel/parser as the only runtime dep', () => {
+    assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['@babel/parser']);
   });
 });

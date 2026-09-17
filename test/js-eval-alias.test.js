@@ -15,8 +15,8 @@ function flagged(code) {
 
 describe('JS eval aliases (Babel walk)', () => {
   it('flags direct eval() and new Function()', () => {
-    assert.match(flagged('eval(code);')[0], /eval\(\)/);
-    assert.match(flagged('new Function("return 1");')[0], /new Function/);
+    assert.match(flagged('eval(code);')[0], /eval/);
+    assert.match(flagged('new Function("return 1");')[0], /Function constructor/);
   });
 
   it('does not false-positive on strings or comments', () => {

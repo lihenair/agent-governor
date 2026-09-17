@@ -24,7 +24,7 @@ function importedShellApi(src) {
   return names.includes('exec') || names.includes('execSync');
 }
 
-function walkJs(dir, acc = []) {
+function walkPublished(dir, acc = []) {
   if (!fs.existsSync(dir)) {
     return acc;
   }
@@ -32,8 +32,8 @@ function walkJs(dir, acc = []) {
     const full = path.join(dir, name);
     const st = fs.statSync(full);
     if (st.isDirectory()) {
-      walkJs(full, acc);
-    } else if (name.endsWith('.js')) {
+      walkPublished(full, acc);
+    } else if (/\.(js|mjs|cjs|py|md|mdc|json)$/.test(name)) {
       acc.push(full);
     }
   }
@@ -46,7 +46,7 @@ describe('no shell spawn in published JS', () => {
       const full = path.join(repoRoot, entry);
       return fs.existsSync(full) && fs.statSync(full).isDirectory();
     });
-    const files = dirs.flatMap((dir) => walkJs(path.join(repoRoot, dir)));
+    const files = dirs.flatMap((dir) => walkPublished(path.join(repoRoot, dir)).filter((f) => f.endsWith('.js')));
     assert.ok(files.length > 0, 'expected published JS');
 
     const hits = [];
@@ -57,6 +57,30 @@ describe('no shell spawn in published JS', () => {
       }
     }
     assert.deepEqual(hits, [], 'use execFileSync/spawnSync argv (no /bin/sh)');
+  });
+
+  it('published artifacts do not contain eval-call or Function-constructor syntax', () => {
+    const listed = (pkg.files || []).map((entry) => path.join(repoRoot, entry));
+    const files = [];
+    for (const entry of listed) {
+      if (!fs.existsSync(entry)) {
+        continue;
+      }
+      if (fs.statSync(entry).isDirectory()) {
+        walkPublished(entry, files);
+      } else if (/\.(js|mjs|cjs|py|md|mdc|json)$/.test(entry)) {
+        files.push(entry);
+      }
+    }
+    const DYNAMIC = /\beval\s*\(|\bnew\s+Function\s*\(/;
+    const hits = [];
+    for (const file of files) {
+      const src = fs.readFileSync(file, 'utf8');
+      if (DYNAMIC.test(src)) {
+        hits.push(path.relative(repoRoot, file));
+      }
+    }
+    assert.deepEqual(hits, [], 'Socket usesEval matches eval( / new Function( even in strings');
   });
 
   it('runFile invokes the binary via argv, not a shell string', () => {

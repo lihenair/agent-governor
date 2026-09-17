@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { parse } from 'shell-quote';
+import { parseShell as parse } from './parser/shell-tokens.js';
 
 function tokenSegments(command) {
   let tokens;

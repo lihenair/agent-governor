@@ -61,9 +61,7 @@
   "homepage": "https://github.com/lihenair/agent-governor#readme",
   "author": "lihenair",
   "dependencies": {
-    "@babel/parser": "^7.28.0",
-    "@babel/traverse": "^7.28.0",
-    "shell-quote": "^1.10.0"
+    "@babel/parser": "^7.28.0"
   },
   "peerDependencies": {
     "@ast-grep/napi": "^0.45.3"
