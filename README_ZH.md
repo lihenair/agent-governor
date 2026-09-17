@@ -58,6 +58,7 @@ AI 编程 Agent 很快，但存在**非确定性与上下文漂移**：
 * 🔄 **SessionStart / PreCompact 规则重注入**——上下文被清空或压缩后，governor 重新注入当前生效的规则和 Agent 被拦过的次数。架构漂移死在它出生的地方。
 * 🎒 **预设规则包与 Rulebook**——`--preset security-hard|frontend|python|strict` 一键拿到有主见的基线；rulebook 是只加不减的策略包（官方随附 terraform / aws / k8s）。
 * 📊 **`governor report`**——审计摘要：总拦截、拦截率、Top 触发规则、最近一次拦截。`--json` 给机器。
+* 🔎 **`governor audit`**——按 `--since` / `--decision` / `--rule` / `--session` 查询 `.agent-governor/audit.log`；`--format table|json`。`audit gc --older-than 30d` 清理过期记录。
 * 🩺 **`governor doctor` 与 `governor status`**——自检一切（运行时、配置、Hook、实弹拦截演练），检测本地策略相对提交基线的削弱。都可以接进 CI。
 * 🪟 **Windows 可用**——分发器是 Node；Bash / Python 运行时可选。
 
@@ -164,6 +165,8 @@ npx agent-governor explain --config governor.config.json   # 输出编译后的�
 npx agent-governor doctor                # 自检（失败 exit 1）
 npx agent-governor status                # 当前策略 + 与提交基线的漂移（漂移 exit 1）
 npx agent-governor report [--json]       # 审计摘要
+npx agent-governor audit [--since 24h] [--decision deny] [--rule id] [--session id] [--format table|json]
+npx agent-governor audit gc --older-than 30d
 npx agent-governor rule list | rule add <name...>   # 叠加式规则包
 npx agent-governor version
 ```

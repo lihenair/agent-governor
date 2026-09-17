@@ -58,6 +58,7 @@ AI coding agents are incredibly fast, but they suffer from **non-determinism and
 * 🔄 **Rule re-injection on SessionStart / PreCompact** — after a context wipe or compaction, the governor re-injects which rules are active and how many times the agent has been blocked. Architecture drift dies where it's born.
 * 🎒 **Preset policy packs & rulebooks** — `--preset security-hard|frontend|python|strict`, plus additive-only rulebooks (terraform / aws / k8s ship officially) that can never weaken your policy.
 * 📊 **`governor report`** — audit digest: total blocks, block rate, top triggered rules, last intervention. `--json` for machines.
+* 🔎 **`governor audit`** — query `.agent-governor/audit.log` by `--since` / `--decision` / `--rule` / `--session`; `--format table|json`. `audit gc --older-than 30d` drops old entries.
 * 🩺 **`governor doctor` & `governor status`** — self-check everything (runtime, config, hooks, live deny dry-run) and detect local policy drift vs the committed baseline. Wire both into CI.
 * 🪟 **Windows-safe** — dispatcher is Node; Bash/Python runtimes optional.
 
@@ -164,6 +165,8 @@ npx agent-governor explain --config governor.config.json   # dump compiled rules
 npx agent-governor doctor                # self-check (exit 1 on failure)
 npx agent-governor status                # policy + drift vs committed baseline (exit 1 on drift)
 npx agent-governor report [--json]       # audit digest
+npx agent-governor audit [--since 24h] [--decision deny] [--rule id] [--session id] [--format table|json]
+npx agent-governor audit gc --older-than 30d
 npx agent-governor rule list | rule add <name...>   # additive rulebook packs
 npx agent-governor version
 ```

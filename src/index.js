@@ -8,6 +8,7 @@ export { inspectSource, languageIdFor } from './inspect.js';
 export { parseBash, collectCapabilities } from './parser/bash.js';
 export { computeHashes, ensureSelfProtect, verifyHashes } from './self-protect.js';
 export { logDecision } from './audit/logger.js';
+export { formatAudit, gcAudit, queryAudit } from './audit/query.js';
 export { evaluateHook, runHookGuard } from './dispatch.js';
 export { buildSessionContext, runSessionHook, summarizeRecentBlocks } from './session-context.js';
 export { evaluateReadScan, scanForInjections, extractReadContent, isReadTool } from './read-guard.js';
