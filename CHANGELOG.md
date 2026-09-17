@@ -7,13 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-17
+
 ### Changed
 
-- **Default `npm i` no longer downloads ~300 MB of `@ast-grep` grammars.**
-  `@ast-grep/napi` is an optional peer; `@ast-grep/lang-*` packs are
-  dev-only (CI/tests) or user-installed when `"engine": "ast-grep"`.
-  Unused csharp/php/ruby packs are gone. Default runtime deps are Babel +
-  `shell-quote` (~7 MB). `governor doctor` reports napi / lang-pack status.
+- **Default `npm i` is ~8.5 MB, not ~300 MB.** `@ast-grep/napi` is an optional
+  peer; `@ast-grep/lang-*` packs are installed only for CI/tests or when you
+  opt into `"engine": "ast-grep"`. Unused csharp/php/ruby packs are gone.
+  Runtime deps: Babel + `shell-quote`. `governor doctor` reports napi status.
+
+### Added
+
+- **`governor validate`** — schema check of `governor.config.json` (file,
+  field path, reason). Default `failureMode: "open"`.
+- **`governor audit`** — query the JSONL log (`--since` / `--decision` /
+  `--rule` / `--session` / `--format table|json`) and `audit gc --older-than`.
+
+### Fixed
+
+- **`npx agent-governor version`** printed `0.1.0` via the `.bin` shim.
+  Version is now read from `import.meta.url`.
+
+### Docs
+
+- How-it-works diagram is a mermaid flowchart (PreToolUse / PostToolUse /
+  allow-deny / audit.log).
 
 ## [0.7.0] - 2026-09-16
 

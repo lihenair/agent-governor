@@ -1,6 +1,6 @@
 {
   "name": "agent-governor",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Deterministic Runtime Guardrails for Claude Code & AI Coding Agents",
   "license": "MIT",
   "type": "module",
