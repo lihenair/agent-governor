@@ -124,7 +124,7 @@ Fail-open on internal errors (a governor bug must not freeze the agent loop), fa
 **Option B — npm:**
 
 ```bash
-npm install -D agent-governor
+npm install -D agent-governor   # ~8.5 MB (Babel + shell-quote). ast-grep is opt-in.
 npx agent-governor init
 ```
 
@@ -276,6 +276,11 @@ Copy [`governor.config.example.json`](./governor.config.example.json) to start. 
 | Python stdlib `ast` | `python3` | ~50ms (process start dominates; parse is 0.02ms) |
 | Rust/Go/Kotlin/Swift/C/C++/Dart | ast-grep (tree-sitter) | < 7ms (500 LOC) |
 | Regex SOP (fallback) | Node | < 5ms |
+
+| Install | Size |
+| --- | --- |
+| `npm i -D agent-governor` (default) | **~8.5 MB** unpacked (`node_modules`) · **~71 kB** tarball |
+| + `"engine": "ast-grep"` + lang packs | extra `@ast-grep/napi` (~7 MB) and only the grammars you install |
 
 Run `npm run build` to emit `dist/*.js` bundles.
 

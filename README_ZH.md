@@ -124,7 +124,7 @@ flowchart LR
 **方式 B——npm：**
 
 ```bash
-npm install -D agent-governor
+npm install -D agent-governor   # 约 8.5 MB（Babel + shell-quote）。ast-grep 按需安装。
 npx agent-governor init
 ```
 
@@ -276,6 +276,11 @@ npm i -D @ast-grep/napi @ast-grep/lang-rust @ast-grep/lang-go
 | Python 标准库 `ast` | `python3` | ~50ms（进程启动为主；解析仅 0.02ms） |
 | Rust/Go/Kotlin/Swift/C/C++/Dart | ast-grep（tree-sitter） | < 7ms（500 行） |
 | 正则 SOP（兜底） | Node | < 5ms |
+
+| 安装 | 体积 |
+| --- | --- |
+| `npm i -D agent-governor`（默认） | **约 8.5 MB** 落地（`node_modules`）· **约 71 kB** tarball |
+| 再开 `"engine": "ast-grep"` + 语言包 | 另加 `@ast-grep/napi`（约 7 MB）和你装的 grammar |
 
 `npm run build` 产出 `dist/*.js` 打包。
 
