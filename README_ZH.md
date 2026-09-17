@@ -68,17 +68,32 @@ AI 编程 Agent 很快，但存在**非确定性与上下文漂移**：
 
 Agent Governor 挂接各宿主的原生 Hook 运行时（Claude Code、Codex CLI、Gemini CLI、Cursor、Windsurf、OpenCode）。载荷自动识别、归一化，决定按宿主原生协议输出。
 
-```
-┌─────────────────┐      Tool Request       ┌──────────────────────────┐
-│                 │ ── (Edit/Write/Bash) ─► │  Agent Governor          │
-│  Coding Agent   │                         │                          │
-│ (CC/Codex/      │ ◄── block + reason ──── │  1. 配置盾               │
-│  Gemini)        │                         │  2. Bash 能力分析        │
-│                 │ ── (Read/WebFetch) ───► │  3. 语法树源码策略       │
-│                 │      注入扫描           │  4. 注入扫描器           │
-└─────────────────┘                         └────────────┬─────────────┘
-                                                         │
-                                              audit.log（脱敏+哈希）
+```mermaid
+flowchart LR
+  Agent["编程 Agent<br/>Claude · Codex · Gemini<br/>Cursor · Windsurf · OpenCode"]
+
+  subgraph Gov["Agent Governor"]
+    direction TB
+    Pre["PreToolUse<br/>1. 配置盾<br/>2. Bash 能力分析"]
+    Post["PostToolUse<br/>3. 语法树源码策略<br/>4. 注入扫描器"]
+    Decision{"放行 / 拦截"}
+    Pre --> Decision
+    Post --> Decision
+  end
+
+  Agent -->|"Edit / Write / Bash"| Pre
+  Agent -->|"Read / WebFetch"| Post
+  Decision -->|"拦截 + 原因"| Agent
+  Decision --> Audit[("audit.log<br/>脱敏 + 哈希")]
+
+  classDef agent fill:#E8F1FF,stroke:#3B6FD8,stroke-width:1.5px,color:#1a1a1a
+  classDef check fill:#E9F7EF,stroke:#2E8B57,stroke-width:1.5px,color:#1a1a1a
+  classDef decide fill:#F3E8FF,stroke:#7E57C2,stroke-width:1.5px,color:#1a1a1a
+  classDef log fill:#FFF6D9,stroke:#C9A227,stroke-width:1.5px,color:#1a1a1a
+  class Agent agent
+  class Pre,Post check
+  class Decision decide
+  class Audit log
 ```
 
 宿主支持与协议细节：[docs/hosts.md](./docs/hosts.md)。

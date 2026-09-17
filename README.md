@@ -68,17 +68,32 @@ AI coding agents are incredibly fast, but they suffer from **non-determinism and
 
 Agent Governor taps each host's native hook runtime (Claude Code `PreToolUse`/`PostToolUse`/`SessionStart`/`PreCompact`; Codex CLI and Gemini CLI equivalents). Payloads are auto-detected and normalized; decisions are emitted in the host's native contract.
 
-```
-┌─────────────────┐      Tool Request       ┌──────────────────────────┐
-│                 │ ── (Edit/Write/Bash) ─► │  Agent Governor          │
-│  Coding Agent   │                         │                          │
-│ (CC/Codex/      │ ◄── block + reason ──── │  1. Config shield        │
-│  Gemini)        │                         │  2. Bash capabilities    │
-│                 │ ── (Read/WebFetch) ───► │  3. Syntax-tree policy   │
-│                 │      injection scan     │  4. Injection scanner    │
-└─────────────────┘                         └────────────┬─────────────┘
-                                                         │
-                                              audit.log (redacted, hashed)
+```mermaid
+flowchart LR
+  Agent["Coding Agent<br/>Claude · Codex · Gemini<br/>Cursor · Windsurf · OpenCode"]
+
+  subgraph Gov["Agent Governor"]
+    direction TB
+    Pre["PreToolUse<br/>1. Config shield<br/>2. Bash capabilities"]
+    Post["PostToolUse<br/>3. Syntax-tree policy<br/>4. Injection scanner"]
+    Decision{"allow / deny"}
+    Pre --> Decision
+    Post --> Decision
+  end
+
+  Agent -->|"Edit / Write / Bash"| Pre
+  Agent -->|"Read / WebFetch"| Post
+  Decision -->|"block + reason"| Agent
+  Decision --> Audit[("audit.log<br/>redacted, hashed")]
+
+  classDef agent fill:#E8F1FF,stroke:#3B6FD8,stroke-width:1.5px,color:#1a1a1a
+  classDef check fill:#E9F7EF,stroke:#2E8B57,stroke-width:1.5px,color:#1a1a1a
+  classDef decide fill:#F3E8FF,stroke:#7E57C2,stroke-width:1.5px,color:#1a1a1a
+  classDef log fill:#FFF6D9,stroke:#C9A227,stroke-width:1.5px,color:#1a1a1a
+  class Agent agent
+  class Pre,Post check
+  class Decision decide
+  class Audit log
 ```
 
 Host support and protocol details: [docs/hosts.md](./docs/hosts.md).
