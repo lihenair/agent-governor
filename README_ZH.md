@@ -2,7 +2,7 @@
 
 # 🛡️ Agent Governor
 
-**面向 Claude Code、Codex CLI 与 Gemini CLI 的确定性运行时护栏**
+**面向 Claude Code、Codex、Gemini、Cursor、Windsurf 与 OpenCode 的确定性运行时护栏**
 
 *语法树级代码检查、读取侧提示注入扫描、硬件级 Hook——一份配置，守护六个编程 Agent。*
 
@@ -43,7 +43,7 @@ AI 编程 Agent 很快，但存在**非确定性与上下文漂移**：
 | 能力 | Agent Governor | 常见护栏 |
 | --- | --- | --- |
 | Bash 命令分析 | ✅ argv 级解析 + 能力标签 | shell 字符串匹配 |
-| 源码检查 | ✅ **真语法树**（Babel / Python `ast` / tree-sitter）| 常为正则或没有 |
+| 源码检查 | ✅ **真语法树**（`@babel/parser` / Python `ast` / tree-sitter）| 常为正则或没有 |
 | **读取侧注入扫描** | ✅ **Agent 读到什么也检查** | ❌ 只管写入侧 |
 | 压缩后规则重注入 | ✅ SessionStart / PreCompact 钩子 | ❌ 规则跟着上下文一起被压掉 |
 | 团队策略漂移检测 | ✅ `governor status` 对比提交基线 | ❌ |
@@ -52,8 +52,8 @@ AI 编程 Agent 很快，但存在**非确定性与上下文漂移**：
 ### 护栏检查项
 
 * 🛡️ **零信任配置盾**——锁定 JS、Python、Rust、Go、Flutter、iOS、Android 生态的工具链清单（`tsconfig.json`、`package.json`、锁文件、`Cargo.toml`、`go.mod`、`pubspec.yaml`、`Podfile`、Gradle、`AndroidManifest.xml` 等）。
-* 🧬 **语法树级源码策略**——JS/TS 用 Babel AST；Python 用标准库 `ast`（接得住别名调用、属性调用、计算属性查找，不只是子串搜索）；Rust/Go/Kotlin/Swift/C/C++/Dart 用 tree-sitter 结构检查。字符串和注释在语法树上不是语句，**天然零误报**。
-* 💣 **Bash 能力分析**——把命令解析成程序 + argv，打上能力标签（`git.push.force`、`hooks.bypass`、`secret.path.read`、`ci.path.write`），命令包在 `sh -c` 里、写入走 `tee` / `sed -i` / 重定向，一样拦得住。
+* 🧬 **语法树级源码策略**——JS/TS 用 `@babel/parser` AST；Python 用标准库 `ast`（接得住别名调用、属性调用、计算属性查找，不只是子串搜索）；Rust/Go/Kotlin/Swift/C/C++/Dart 用 tree-sitter 结构检查。字符串和注释在语法树上不是语句，**天然零误报**。
+* 💣 **Bash 能力分析**——把命令解析成程序 + argv，打上能力标签（`git.push.force`、`git.hook.bypass`、`secrets.read`、`ci.modify`），命令包在 `sh -c` 里、写入走 `tee` / `sed -i` / 重定向，一样拦得住。
 * 📖 **读取侧注入扫描（业界首创）**——PostToolUse 检查 Agent *读到*的内容：抓取的网页、文件、搜索结果。检测指令覆盖、角色劫持、`curl | sh`、env/密钥外传、零宽字符隐写。加权评分；`injectionPatterns` 支持自定义检测器。
 * 🔄 **SessionStart / PreCompact 规则重注入**——上下文被清空或压缩后，governor 重新注入当前生效的规则和 Agent 被拦过的次数。架构漂移死在它出生的地方。
 * 🎒 **预设规则包与 Rulebook**——`--preset security-hard|frontend|python|strict` 一键拿到有主见的基线；rulebook 是只加不减的策略包（官方随附 terraform / aws / k8s）。
@@ -124,7 +124,7 @@ flowchart LR
 **方式 B——npm：**
 
 ```bash
-npm install -D agent-governor   # 约 8.5 MB（@babel/parser）。ast-grep 按需安装。
+npm install -D agent-governor   # 约 6 MB 落地（仅 @babel/parser）。ast-grep 按需安装。
 npx agent-governor init
 ```
 
@@ -236,7 +236,7 @@ npx agent-governor explain --preset security-hard   # 预览会多保护哪些�
 
 | 引擎 | 语言 | 说明 |
 | --- | --- | --- |
-| **Babel AST**（默认） | JS/TS | 结构化识别 `eval` / `new Function` / 自定义禁用调用 |
+| **`@babel/parser` AST**（默认） | JS/TS | 结构化识别 `eval` / Function 构造 / 自定义禁用调用 |
 | **Python 标准库 `ast`**（默认） | Python | 别名、属性与计算属性查找；语法错误片段降级正则兜底 |
 | **tree-sitter via ast-grep**（可选） | Rust, Go, Kotlin, Swift, C, C++, Dart | 字符串/注释结构性免疫误报。**默认不安装。** |
 | **正则 SOP**（默认兜底） | 未装 ast-grep 的 native 语言 | 零依赖启发式；非代码文本有少量误报风险 |
@@ -272,15 +272,17 @@ npm i -D @ast-grep/napi @ast-grep/lang-rust @ast-grep/lang-go
 | 检查类型 | 运行时 | 耗时 |
 | --- | --- | --- |
 | 配置盾（PreToolUse） | Node 分发器 | < 8ms |
-| JS/TS AST | Babel | < 28ms（1000 行） |
+| JS/TS AST | `@babel/parser` | < 28ms（1000 行） |
 | Python 标准库 `ast` | `python3` | ~50ms（进程启动为主；解析仅 0.02ms） |
 | Rust/Go/Kotlin/Swift/C/C++/Dart | ast-grep（tree-sitter） | < 7ms（500 行） |
 | 正则 SOP（兜底） | Node | < 5ms |
 
 | 安装 | 体积 |
 | --- | --- |
-| `npm i -D agent-governor`（默认） | **约 8.5 MB** 落地（`node_modules`）· **约 71 kB** tarball |
+| `npm i -D agent-governor`（默认） | **约 6 MB** 落地（`node_modules`）· **约 75 kB** tarball |
 | 再开 `"engine": "ast-grep"` + 语言包 | 另加 `@ast-grep/napi`（约 7 MB）和你装的 grammar |
+
+运行时依赖只有 `@babel/parser`（没有 `shell-quote`、没有 `@babel/traverse`）。npm 用 GitHub OIDC 发版并带 provenance；没有 `postinstall`。
 
 `npm run build` 产出 `dist/*.js` 打包。
 

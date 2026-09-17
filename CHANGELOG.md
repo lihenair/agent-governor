@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- README install size and runtime graph match 0.7.4 (`@babel/parser` only, ~6 MB
+  unpacked / ~75 kB tarball). Capability tag names match the engine.
+
 ## [0.7.4] - 2026-09-17
 
 ### Fixed

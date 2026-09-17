@@ -2,7 +2,7 @@
 
 # 🛡️ Agent Governor
 
-**Deterministic Runtime Guardrails for Claude Code, Codex CLI & Gemini CLI**
+**Deterministic Runtime Guardrails for Claude Code, Codex, Gemini, Cursor, Windsurf & OpenCode**
 
 *Syntax-tree code checks, read-side prompt-injection scanning, and hardware-grade hooks — one config, six coding agents.*
 
@@ -43,7 +43,7 @@ AI coding agents are incredibly fast, but they suffer from **non-determinism and
 | Capability | Agent Governor | Typical guardrails |
 | --- | --- | --- |
 | Bash command analysis | ✅ argv-level + capability tags | shell string matching |
-| Source code checks | ✅ **true syntax trees** (Babel / Python `ast` / tree-sitter) | often regex or absent |
+| Source code checks | ✅ **true syntax trees** (`@babel/parser` / Python `ast` / tree-sitter) | often regex or absent |
 | **Read-side injection scanning** | ✅ **what the agent reads is scanned too** | ❌ write-side only |
 | Rule re-injection after compaction | ✅ SessionStart / PreCompact hooks | ❌ rules get compacted away |
 | Team policy drift detection | ✅ `governor status` vs committed baseline | ❌ |
@@ -52,8 +52,8 @@ AI coding agents are incredibly fast, but they suffer from **non-determinism and
 ### Guardrail checks
 
 * 🛡️ **Zero-Trust Config Shield** — locks toolchain manifests across JS, Python, Rust, Go, Flutter, iOS, Android ecosystems (`tsconfig.json`, `package.json`, lockfiles, `Cargo.toml`, `go.mod`, `pubspec.yaml`, `Podfile`, Gradle, `AndroidManifest.xml`, ...).
-* 🧬 **Syntax-tree source policy** — Babel AST for JS/TS, Python's stdlib `ast` (catches aliased calls, attribute calls, computed lookups — not just a substring search), tree-sitter structural checks for Rust/Go/Kotlin/Swift/C/C++/Dart. Strings and comments are structurally immune to false positives.
-* 💣 **Bash capability analysis** — parses commands into program + argv, tags capabilities (`git.push.force`, `hooks.bypass`, `secret.path.read`, `ci.path.write`), and catches the same violation even when the command is wrapped in `sh -c` or a write lands via `tee` / `sed -i` / redirection.
+* 🧬 **Syntax-tree source policy** — `@babel/parser` AST for JS/TS, Python's stdlib `ast` (catches aliased calls, attribute calls, computed lookups — not just a substring search), tree-sitter structural checks for Rust/Go/Kotlin/Swift/C/C++/Dart. Strings and comments are structurally immune to false positives.
+* 💣 **Bash capability analysis** — parses commands into program + argv, tags capabilities (`git.push.force`, `git.hook.bypass`, `secrets.read`, `ci.modify`), and catches the same violation even when the command is wrapped in `sh -c` or a write lands via `tee` / `sed -i` / redirection.
 * 📖 **Read-side injection scanning (industry first)** — PostToolUse guard inspects what the agent *reads*: fetched pages, files, search results. Detects instruction override, role hijack, `curl | sh`, env/secret exfiltration, hidden zero-width Unicode. Weighted scoring; custom detectors via `injectionPatterns`.
 * 🔄 **Rule re-injection on SessionStart / PreCompact** — after a context wipe or compaction, the governor re-injects which rules are active and how many times the agent has been blocked. Architecture drift dies where it's born.
 * 🎒 **Preset policy packs & rulebooks** — `--preset security-hard|frontend|python|strict`, plus additive-only rulebooks (terraform / aws / k8s ship officially) that can never weaken your policy.
@@ -124,7 +124,7 @@ Fail-open on internal errors (a governor bug must not freeze the agent loop), fa
 **Option B — npm:**
 
 ```bash
-npm install -D agent-governor   # ~8.5 MB (@babel/parser). ast-grep is opt-in.
+npm install -D agent-governor   # ~6 MB unpacked (@babel/parser only). ast-grep is opt-in.
 npx agent-governor init
 ```
 
@@ -236,7 +236,7 @@ Persist with `"preset": "security-hard"` in `governor.config.json` (file wins ov
 
 | Engine | Languages | Notes |
 | --- | --- | --- |
-| **Babel AST** (default) | JS/TS | Structural `eval` / `new Function` / custom calls |
+| **`@babel/parser` AST** (default) | JS/TS | Structural `eval` / Function constructor / custom calls |
 | **Python stdlib `ast`** (default) | Python | Aliases, attribute & computed lookups; regex fallback for syntax-error fragments |
 | **tree-sitter via ast-grep** (opt-in) | Rust, Go, Kotlin, Swift, C, C++, Dart | Strings/comments structurally immune to false positives. **Not installed by default.** |
 | **Regex SOP** (default fallback) | native langs without ast-grep | Zero-dependency heuristic; some false-positive risk on non-code text |
@@ -272,15 +272,17 @@ Copy [`governor.config.example.json`](./governor.config.example.json) to start. 
 | Check Type | Runtime | Execution Time |
 | --- | --- | --- |
 | Config shield (PreToolUse) | Node dispatcher | < 8ms |
-| JS/TS AST | Babel | < 28ms (1000 LOC) |
+| JS/TS AST | `@babel/parser` | < 28ms (1000 LOC) |
 | Python stdlib `ast` | `python3` | ~50ms (process start dominates; parse is 0.02ms) |
 | Rust/Go/Kotlin/Swift/C/C++/Dart | ast-grep (tree-sitter) | < 7ms (500 LOC) |
 | Regex SOP (fallback) | Node | < 5ms |
 
 | Install | Size |
 | --- | --- |
-| `npm i -D agent-governor` (default) | **~8.5 MB** unpacked (`node_modules`) · **~71 kB** tarball |
+| `npm i -D agent-governor` (default) | **~6 MB** unpacked (`node_modules`) · **~75 kB** tarball |
 | + `"engine": "ast-grep"` + lang packs | extra `@ast-grep/napi` (~7 MB) and only the grammars you install |
+
+Runtime dependency is `@babel/parser` only (no `shell-quote`, no `@babel/traverse`). npm publishes via GitHub OIDC with provenance; there is no `postinstall`.
 
 Run `npm run build` to emit `dist/*.js` bundles.
 
