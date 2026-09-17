@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-09-17
+
 ### Fixed
 
 - JS AST walk now flags aliased / member / computed / indirect `eval` and `Function`
