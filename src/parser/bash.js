@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { parse } from 'shell-quote';
+import { parseShell as parse } from './shell-tokens.js';
 import { capabilitiesFor } from './capabilities.js';
 
 function safeParse(command) {

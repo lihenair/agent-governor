@@ -6,14 +6,14 @@
  * Status compares the working config against the committed one and reports
  * exactly what got weaker, so drift is visible instead of silent.
  */
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadConfig, CONFIG } from './config.js';
+import { runFile } from './run-file.js';
 
 function gitShow(repoRoot, relPath) {
   try {
-    return execSync(`git show HEAD:${JSON.stringify(relPath)}`, {
+    return runFile('git', ['show', `HEAD:${relPath}`], {
       cwd: repoRoot,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
@@ -25,7 +25,7 @@ function gitShow(repoRoot, relPath) {
 
 function gitIsRepo(repoRoot) {
   try {
-    execSync('git rev-parse --is-inside-work-tree', {
+    runFile('git', ['rev-parse', '--is-inside-work-tree'], {
       cwd: repoRoot,
       stdio: ['ignore', 'ignore', 'ignore'],
     });

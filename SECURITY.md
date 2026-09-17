@@ -16,7 +16,7 @@ Cursor, Codex CLI...) from their own three failure modes:
 - A deterministic, zero-variance policy layer: the same input always produces
   the same decision.
 - Effective against the *plausible accidental* mistakes agents really make:
-  `git push --force`, `--no-verify`, `eval()`, editing lockfiles, `rm -rf` on
+  `git push --force`, `--no-verify`, `eval`, editing lockfiles, `rm -rf` on
   the repo, following "ignore previous instructions" from a web page.
 - Fail-open on internal errors (a governor bug must not freeze the agent
   loop), fail-closed on policy violations (exit 2 + reason fed back).

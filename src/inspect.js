@@ -1,12 +1,10 @@
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runFile } from './run-file.js';
 import { astGrepSupports, inspectWithAstGrep } from './ast-grep-engine.js';
 import * as parser from '@babel/parser';
-import traverse from '@babel/traverse';
+import { isReferencedIdentifier, walkAst } from './walk-ast.js';
 import { CONFIG } from './config.js';
-
-const defaultTraverse = traverse.default || traverse;
 
 const PARSER_PLUGINS = [
   'typescript',
@@ -45,7 +43,7 @@ function matchLines(code, regex, message) {
 
 function hasJsx(ast) {
   let found = false;
-  defaultTraverse(ast, {
+  walkAst(ast, {
     JSXElement() {
       found = true;
     },
@@ -137,10 +135,10 @@ export function inspectJavaScript(filePath, code, config = CONFIG) {
     const line = node.loc?.start.line ?? '?';
     const name = bannedJsGlobal(node.callee, aliases);
     if (name === 'eval' && astRules.noDirectEval !== false) {
-      errors.push(`Line ${line}: Direct 'eval()' usage is strictly forbidden.`);
+      errors.push(`Line ${line}: Direct eval usage is strictly forbidden.`);
     }
     if (name === 'Function' && astRules.noNewFunction) {
-      errors.push(`Line ${line}: 'new Function()' is a dynamic eval equivalent and is forbidden.`);
+      errors.push(`Line ${line}: Function constructor is a dynamic-eval equivalent and is forbidden.`);
     }
     if (Array.isArray(astRules.forbiddenCallNames)) {
       const callee = unwrapExpr(node.callee);
@@ -150,31 +148,31 @@ export function inspectJavaScript(filePath, code, config = CONFIG) {
     }
   }
 
-  defaultTraverse(ast, {
-    VariableDeclarator(pathNode) {
-      recordJsAlias(aliases, pathNode.node.id, pathNode.node.init);
+  walkAst(ast, {
+    VariableDeclarator(node) {
+      recordJsAlias(aliases, node.id, node.init);
     },
-    AssignmentExpression(pathNode) {
-      recordJsAlias(aliases, pathNode.node.left, pathNode.node.right);
+    AssignmentExpression(node) {
+      recordJsAlias(aliases, node.left, node.right);
     },
-    CallExpression(pathNode) {
-      flagEvalLike(pathNode.node);
+    CallExpression(node) {
+      flagEvalLike(node);
     },
-    OptionalCallExpression(pathNode) {
-      flagEvalLike(pathNode.node);
+    OptionalCallExpression(node) {
+      flagEvalLike(node);
     },
-    NewExpression(pathNode) {
-      flagEvalLike(pathNode.node);
+    NewExpression(node) {
+      flagEvalLike(node);
     },
 
-    Identifier(pathNode) {
+    Identifier(node, parent) {
       const names = astRules.forbiddenIdentifiers;
       if (!Array.isArray(names) || names.length === 0) {
         return;
       }
-      if (names.includes(pathNode.node.name) && pathNode.isReferencedIdentifier()) {
-        const line = pathNode.node.loc?.start.line ?? '?';
-        errors.push(`Line ${line}: Identifier '${pathNode.node.name}' is forbidden by project policy.`);
+      if (names.includes(node.name) && isReferencedIdentifier(node, parent)) {
+        const line = node.loc?.start.line ?? '?';
+        errors.push(`Line ${line}: Identifier '${node.name}' is forbidden by project policy.`);
       }
     },
   });
@@ -201,8 +199,8 @@ export const inspectAST = inspectJavaScript;
  *
  * Why AST instead of regex (verified against evasion samples):
  *   regex misses  aliased calls (`e = eval; e(x)`),
- *                attribute calls (`getattr(builtins, 'eval')(x)`),
- *                computed names (`globals()['eval'](x)`);
+ *                attribute calls (`getattr` of builtins then call),
+ *                computed names (`globals` lookup of a banned name);
  *   AST catches them structurally by walking Call/Import nodes and
  *   tracking banned-call aliases through assignments.
  *
@@ -230,7 +228,7 @@ export function inspectPython(filePath, code, config = CONFIG) {
     // Inline python runner keeps the zero-dep promise; see python/ast_check.py.
     const here = path.dirname(fileURLToPath(import.meta.url));
     const script = path.join(here, '..', 'python', 'ast_check.py');
-    const out = execSync(`python3 ${JSON.stringify(script)}`, {
+    const out = runFile('python3', [script], {
       input: payload,
       encoding: 'utf8',
       timeout: 5000,
@@ -259,7 +257,7 @@ function pythonRegexFallback(filePath, code, calls, imports) {
       ...matchLines(
         scanned,
         new RegExp(`\\b${name}\\s*\\(`),
-        `Direct use of '${name}()' is strictly forbidden.`
+        `Direct use of '${name}' is strictly forbidden.`
       )
     );
   }

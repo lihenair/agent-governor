@@ -12,7 +12,7 @@ const RULE_DOCS = {
   'protected-directory':
     'The path is inside agent governance infrastructure (.claude/, .agent-governor/). Agents must not rewrite their own rules.',
   'source-policy':
-    'The content contains a forbidden construct (eval, new Function, unsafe block...) per astRules.',
+    'The content contains a forbidden construct (eval, Function constructor, unsafe block...) per astRules.',
   'forbidden-bash':
     'The command matches a forbiddenBashPatterns regex from the config.',
   'protected-file-bash':

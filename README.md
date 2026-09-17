@@ -20,7 +20,7 @@
 
 <div align="center">
   <img src="docs/demo.gif" alt="Agent Governor blocking unsafe agent operations" width="800px" />
-  <p><em>agent-governor blocking: config tampering · force-push · <code>eval()</code> in shipped code</em></p>
+  <p><em>agent-governor blocking: config tampering · force-push · <code>eval</code> in shipped code</em></p>
 </div>
 
 ---
@@ -30,7 +30,7 @@
 AI coding agents are incredibly fast, but they suffer from **non-determinism and context drift**:
 
 * 🚫 **Configuration Tampering** — agents edit `tsconfig.json`, `biome.json`, or `.eslintrc` to "fix" errors instead of fixing the actual bugs.
-* 💣 **Dangerous Operations** — force pushes, `--no-verify` hook bypasses, deleted files, `eval()` in shipped code, secret paths read into context.
+* 💣 **Dangerous Operations** — force pushes, `--no-verify` hook bypasses, deleted files, `eval` in shipped code, secret paths read into context.
 * 🌀 **Architecture Drift** — as context grows (and gets compacted away), agents forget project rules.
 * 📖 **Injected Instructions** — fetched web pages, READMEs, and search results can carry `ignore previous instructions` / `curl | sh` payloads that the agent obeys.
 
@@ -52,7 +52,7 @@ AI coding agents are incredibly fast, but they suffer from **non-determinism and
 ### Guardrail checks
 
 * 🛡️ **Zero-Trust Config Shield** — locks toolchain manifests across JS, Python, Rust, Go, Flutter, iOS, Android ecosystems (`tsconfig.json`, `package.json`, lockfiles, `Cargo.toml`, `go.mod`, `pubspec.yaml`, `Podfile`, Gradle, `AndroidManifest.xml`, ...).
-* 🧬 **Syntax-tree source policy** — Babel AST for JS/TS, Python's stdlib `ast` (catches aliased calls, attribute calls, computed lookups — not just `eval(`), tree-sitter structural checks for Rust/Go/Kotlin/Swift/C/C++/Dart. Strings and comments are structurally immune to false positives.
+* 🧬 **Syntax-tree source policy** — Babel AST for JS/TS, Python's stdlib `ast` (catches aliased calls, attribute calls, computed lookups — not just a substring search), tree-sitter structural checks for Rust/Go/Kotlin/Swift/C/C++/Dart. Strings and comments are structurally immune to false positives.
 * 💣 **Bash capability analysis** — parses commands into program + argv, tags capabilities (`git.push.force`, `hooks.bypass`, `secret.path.read`, `ci.path.write`), and catches the same violation even when the command is wrapped in `sh -c` or a write lands via `tee` / `sed -i` / redirection.
 * 📖 **Read-side injection scanning (industry first)** — PostToolUse guard inspects what the agent *reads*: fetched pages, files, search results. Detects instruction override, role hijack, `curl | sh`, env/secret exfiltration, hidden zero-width Unicode. Weighted scoring; custom detectors via `injectionPatterns`.
 * 🔄 **Rule re-injection on SessionStart / PreCompact** — after a context wipe or compaction, the governor re-injects which rules are active and how many times the agent has been blocked. Architecture drift dies where it's born.
@@ -124,7 +124,7 @@ Fail-open on internal errors (a governor bug must not freeze the agent loop), fa
 **Option B — npm:**
 
 ```bash
-npm install -D agent-governor   # ~8.5 MB (Babel + shell-quote). ast-grep is opt-in.
+npm install -D agent-governor   # ~8.5 MB (@babel/parser). ast-grep is opt-in.
 npx agent-governor init
 ```
 

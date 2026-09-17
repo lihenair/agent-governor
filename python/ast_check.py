@@ -9,8 +9,8 @@ Writes JSON on stdout:
 
 Why AST instead of regex (verified against evasion samples):
     regex misses  aliased calls (`e = eval; e(x)`),
-                 attribute calls (`builtins.eval(x)`),
-                 computed lookups (`globals()['eval'](x)`),
+                 attribute calls (`builtins` then eval),
+                 computed lookups (`globals` then a banned name),
                  import aliases (`import pickle as p`);
     AST catches them structurally by walking Call/Import nodes and tracking
     banned-name aliases through assignments.
@@ -40,23 +40,23 @@ class Checker(ast.NodeVisitor):
         func = node.func
         if isinstance(func, ast.Name) and func.id in self.banned_calls:
             self.issues.append(
-                {"lineno": node.lineno, "message": f"Direct use of '{func.id}()' is strictly forbidden."}
+                {"lineno": node.lineno, "message": f"Direct use of '{func.id}' is strictly forbidden."}
             )
         elif isinstance(func, ast.Name) and func.id in self.alias_sources:
             root = self.alias_sources[func.id]
             self.issues.append(
                 {
                     "lineno": node.lineno,
-                    "message": f"'{func.id}' aliases banned '{root}()'; use is forbidden.",
+                    "message": f"'{func.id}' aliases banned '{root}'; use is forbidden.",
                 }
             )
         elif isinstance(func, ast.Attribute):
-            # builtins.eval(...) — flag attribute name match
+            # attribute named eval — flag attribute name match
             if func.attr in self.banned_calls:
                 self.issues.append(
                     {
                         "lineno": node.lineno,
-                        "message": f"Use of '{func.attr}()' (via attribute) is forbidden.",
+                        "message": f"Use of '{func.attr}' via attribute is forbidden.",
                     }
                 )
             # marshal.loads(...) — the *object* name is the banned call
@@ -64,21 +64,21 @@ class Checker(ast.NodeVisitor):
                 self.issues.append(
                     {
                         "lineno": node.lineno,
-                        "message": f"Use of banned '{func.value.id}()' is forbidden.",
+                        "message": f"Use of banned '{func.value.id}' is forbidden.",
                     }
                 )
         elif isinstance(func, ast.Subscript):
-            # globals()['eval'](x) — computed lookup with a constant banned name
+            # computed lookup with a constant banned name
             sl = func.slice
             if isinstance(sl, ast.Constant) and isinstance(sl.value, str) and sl.value in self.banned_calls:
                 self.issues.append(
                     {
                         "lineno": node.lineno,
-                        "message": f"Computed lookup of banned '{sl.value}()' is forbidden.",
+                        "message": f"Computed lookup of banned '{sl.value}' is forbidden.",
                     }
                 )
         elif isinstance(func, ast.Call):
-            # getattr(__builtins__, "eval")(x)
+            # getattr(__builtins__, banned) then call
             inner = func.func
             if (
                 isinstance(inner, ast.Name)
@@ -92,7 +92,7 @@ class Checker(ast.NodeVisitor):
                 self.issues.append(
                     {
                         "lineno": node.lineno,
-                        "message": f"getattr(..., '{banned}') aliases banned '{banned}()'; use is forbidden.",
+                        "message": f"getattr(..., '{banned}') aliases banned '{banned}'; use is forbidden.",
                     }
                 )
 

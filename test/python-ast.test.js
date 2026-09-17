@@ -7,19 +7,19 @@ const CONFIG = { astRules: { pythonForbiddenCalls: ['eval', 'exec'], pythonDepre
 test('python-ast: direct eval is flagged with line number', () => {
   const errors = inspectPython('app.py', 'eval(expr)', CONFIG);
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /Line 1: Direct use of 'eval\(\)'/);
+  assert.match(errors[0], /Line 1: Direct use of 'eval'/);
 });
 
 test('python-ast: exec flagged', () => {
   const errors = inspectPython('app.py', 'exec(code)', CONFIG);
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /'exec\(\)'/);
+  assert.match(errors[0], /'exec'/);
 });
 
 test('python-ast: aliased eval is caught (regex could not)', () => {
   const errors = inspectPython('app.py', 'e = eval\ne(expr)', CONFIG);
   assert.ok(errors.length >= 1);
-  assert.match(errors.join(' '), /aliases banned 'eval\(\)'/);
+  assert.match(errors.join(' '), /aliases banned 'eval'/);
 });
 
 test('python-ast: attribute call builtins.eval is caught (regex could not)', () => {

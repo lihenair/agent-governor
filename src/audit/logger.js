@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { previewInput, redact } from './redact.js';
+import { runFile } from '../run-file.js';
 
 export const AUDIT_MAX_BYTES = 10 * 1024 * 1024;
 export const AUDIT_REL = '.agent-governor/audit.log';
@@ -14,7 +14,7 @@ function sha256(value) {
 
 function readBranch(repoRoot) {
   try {
-    return execSync('git rev-parse --abbrev-ref HEAD', {
+    return runFile('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
       cwd: repoRoot,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],

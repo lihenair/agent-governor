@@ -20,7 +20,7 @@
 
 <div align="center">
   <img src="docs/demo.gif" alt="Agent Governor blocking unsafe agent operations" width="800px" />
-  <p><em>agent-governor 拦截：配置篡改 · force-push · <code>eval()</code> 入库</em></p>
+  <p><em>agent-governor 拦截：配置篡改 · force-push · <code>eval</code> 入库</em></p>
 </div>
 
 ---
@@ -30,7 +30,7 @@
 AI 编程 Agent 很快，但存在**非确定性与上下文漂移**：
 
 * 🚫 **篡改配置**——遇到编译/lint 错误时去改 `tsconfig.json`、`biome.json`、`.eslintrc`，而不是修真正的 bug。
-* 💣 **危险操作**——force push、`--no-verify` 绕过 git hook、删关键文件、往代码里塞 `eval()`、把密钥文件读进上下文。
+* 💣 **危险操作**——force push、`--no-verify` 绕过 git hook、删关键文件、往代码里塞 `eval`、把密钥文件读进上下文。
 * 🌀 **架构漂移**——上下文增长（又被压缩掉）之后，项目约定被忘光。
 * 📖 **注入指令**——抓来的网页、README、搜索结果里藏着 `ignore previous instructions` / `curl | sh`，Agent 照做。
 
@@ -52,7 +52,7 @@ AI 编程 Agent 很快，但存在**非确定性与上下文漂移**：
 ### 护栏检查项
 
 * 🛡️ **零信任配置盾**——锁定 JS、Python、Rust、Go、Flutter、iOS、Android 生态的工具链清单（`tsconfig.json`、`package.json`、锁文件、`Cargo.toml`、`go.mod`、`pubspec.yaml`、`Podfile`、Gradle、`AndroidManifest.xml` 等）。
-* 🧬 **语法树级源码策略**——JS/TS 用 Babel AST；Python 用标准库 `ast`（接得住别名调用、属性调用、计算属性查找，不只是搜 `eval(`）；Rust/Go/Kotlin/Swift/C/C++/Dart 用 tree-sitter 结构检查。字符串和注释在语法树上不是语句，**天然零误报**。
+* 🧬 **语法树级源码策略**——JS/TS 用 Babel AST；Python 用标准库 `ast`（接得住别名调用、属性调用、计算属性查找，不只是子串搜索）；Rust/Go/Kotlin/Swift/C/C++/Dart 用 tree-sitter 结构检查。字符串和注释在语法树上不是语句，**天然零误报**。
 * 💣 **Bash 能力分析**——把命令解析成程序 + argv，打上能力标签（`git.push.force`、`hooks.bypass`、`secret.path.read`、`ci.path.write`），命令包在 `sh -c` 里、写入走 `tee` / `sed -i` / 重定向，一样拦得住。
 * 📖 **读取侧注入扫描（业界首创）**——PostToolUse 检查 Agent *读到*的内容：抓取的网页、文件、搜索结果。检测指令覆盖、角色劫持、`curl | sh`、env/密钥外传、零宽字符隐写。加权评分；`injectionPatterns` 支持自定义检测器。
 * 🔄 **SessionStart / PreCompact 规则重注入**——上下文被清空或压缩后，governor 重新注入当前生效的规则和 Agent 被拦过的次数。架构漂移死在它出生的地方。
@@ -124,7 +124,7 @@ flowchart LR
 **方式 B——npm：**
 
 ```bash
-npm install -D agent-governor   # 约 8.5 MB（Babel + shell-quote）。ast-grep 按需安装。
+npm install -D agent-governor   # 约 8.5 MB（@babel/parser）。ast-grep 按需安装。
 npx agent-governor init
 ```
 

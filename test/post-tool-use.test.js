@@ -11,7 +11,7 @@ describe('inspectAST', () => {
       CONFIG
     );
     assert.equal(errors.length, 1);
-    assert.match(errors[0], /eval\(\)/);
+    assert.match(errors[0], /eval/);
   });
 
   it('flags new Function()', () => {
@@ -21,7 +21,7 @@ describe('inspectAST', () => {
       CONFIG
     );
     assert.equal(errors.length, 1);
-    assert.match(errors[0], /new Function/);
+    assert.match(errors[0], /Function constructor/);
   });
 
   it('accepts ordinary TypeScript', () => {
