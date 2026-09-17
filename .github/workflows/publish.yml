@@ -1,10 +1,10 @@
 # Tokenless npm publish with OIDC (trusted publishing) + automatic provenance.
 # Configure npmjs.com → agent-governor → Settings → Trusted Publisher:
-#   Organization or user: lihenair
+#   Organization or user: lihenair   (GitHub login, not the npm username)
 #   Repository:           agent-governor
 #   Workflow filename:    publish.yml   (filename only, not the path)
 #   Environment name:     (leave blank — this job has no GitHub Environment)
-#   Allowed actions:      npm publish
+#   Allowed actions:      npm publish  (not stage-only)
 #
 # Then: bump version, merge to main, git tag vX.Y.Z && git push origin vX.Y.Z
 name: Publish Package
@@ -14,20 +14,21 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - uses: actions/checkout@v7
+      # Do not set registry-url / NODE_AUTH_TOKEN: an empty _authToken
+      # in setup-node's .npmrc makes npm skip OIDC and return PUT 404.
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
-      # Trusted publishing needs npm CLI >= 11.5.1
       - run: npm install -g npm@11.5.1
       - run: npm ci
       - run: npm publish --access public
