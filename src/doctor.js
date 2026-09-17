@@ -10,7 +10,6 @@
  *   4. State: audit log writable, self-protect hashes intact
  *   5. Policy: compiled rule count > 0, dry-run deny works
  */
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -18,6 +17,7 @@ import { loadConfig } from './config.js';
 import { compilePreToolPolicy } from './policy/rules.js';
 import { evaluatePreToolUse } from './pre-tool-use.js';
 import { AST_GREP_INSTALL, describeAstGrepRuntime } from './ast-grep-engine.js';
+import { runFile } from './run-file.js';
 
 const SETTINGS_CANDIDATES = ['.claude/settings.json', '.claude/settings.local.json'];
 
@@ -194,7 +194,7 @@ function checkDenyWorks(projectRoot) {
 
 function checkGitRepo(projectRoot) {
   try {
-    execSync('git rev-parse --is-inside-work-tree', {
+    runFile('git', ['rev-parse', '--is-inside-work-tree'], {
       cwd: projectRoot,
       stdio: ['ignore', 'ignore', 'ignore'],
     });

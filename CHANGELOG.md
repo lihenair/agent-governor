@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Published code no longer uses `child_process.execSync` (Socket "shell access").
+  Git and `python3` run via `execFileSync` with an argv array, not `/bin/sh -c`.
+
 ## [0.7.3] - 2026-09-17
 
 ### Added

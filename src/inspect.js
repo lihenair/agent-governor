@@ -1,6 +1,6 @@
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runFile } from './run-file.js';
 import { astGrepSupports, inspectWithAstGrep } from './ast-grep-engine.js';
 import * as parser from '@babel/parser';
 import traverse from '@babel/traverse';
@@ -230,7 +230,7 @@ export function inspectPython(filePath, code, config = CONFIG) {
     // Inline python runner keeps the zero-dep promise; see python/ast_check.py.
     const here = path.dirname(fileURLToPath(import.meta.url));
     const script = path.join(here, '..', 'python', 'ast_check.py');
-    const out = execSync(`python3 ${JSON.stringify(script)}`, {
+    const out = runFile('python3', [script], {
       input: payload,
       encoding: 'utf8',
       timeout: 5000,
