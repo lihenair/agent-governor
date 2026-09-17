@@ -121,7 +121,23 @@ describe('CLI integration', () => {
   it('prints version', () => {
     const result = runGovernor(['version']);
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /^\d+\.\d+\.\d+/);
+    const expected = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).version;
+    assert.equal(result.stdout.trim(), expected);
+  });
+
+  it('prints package version when invoked via an npx-style .bin symlink', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gov-npx-version-'));
+    const binDir = path.join(tmp, 'node_modules', '.bin');
+    fs.mkdirSync(binDir, { recursive: true });
+    const shim = path.join(binDir, 'agent-governor');
+    fs.symlinkSync(cli, shim);
+    const result = spawnSync(process.execPath, [shim, 'version'], {
+      cwd: tmp,
+      encoding: 'utf8',
+    });
+    const expected = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).version;
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), expected);
   });
 
   it('fail-opens on invalid JSON stdin', () => {

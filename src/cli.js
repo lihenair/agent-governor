@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CONFIG, loadConfig, mergeConfig } from './config.js';
 import { explainConfig, formatTestReport, runDryTest } from './dry-run.js';
 import { initProject, parseLangFlag } from './init.js';
@@ -16,10 +17,17 @@ import { getPreset } from './presets.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
 function readVersion() {
-  const here = path.dirname(path.resolve(process.argv[1] || process.cwd()));
+  const fromModule = path.dirname(fileURLToPath(import.meta.url));
+  let fromArgv = '';
+  try {
+    fromArgv = path.dirname(fs.realpathSync(process.argv[1] || ''));
+  } catch {
+    fromArgv = path.dirname(path.resolve(process.argv[1] || process.cwd()));
+  }
   const guesses = [
-    path.join(here, '../package.json'),
-    path.join(here, '../../package.json'),
+    path.join(fromModule, '../package.json'),
+    path.join(fromArgv, '../package.json'),
+    path.join(fromArgv, '../../package.json'),
     path.join(process.cwd(), 'package.json'),
   ];
   for (const file of guesses) {
