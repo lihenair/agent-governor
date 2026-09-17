@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- GitHub Actions trusted publishing (`.github/workflows/publish.yml`): OIDC to npm,
+  automatic provenance on `v*` tags. No install scripts on `npm i`.
+
 ## [0.7.2] - 2026-09-17
 
 ### Fixed

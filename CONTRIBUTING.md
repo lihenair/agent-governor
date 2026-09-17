@@ -34,3 +34,27 @@ npm test
 6. Open a Pull Request
 
 Please keep hook evaluation **fail-open on internal errors** (exit 0) so a governor crash cannot freeze the agent loop, and **fail-closed on policy violations** (exit 2 + stderr).
+
+## Releasing to npm
+
+Publishes are **not** done with a long-lived npm token. `.github/workflows/publish.yml` uses GitHub Actions OIDC (trusted publishing). Provenance attestations are generated automatically. There is no `postinstall` / `preinstall` script; `prepublishOnly` runs only on the publisher.
+
+One-time setup on [npmjs.com/package/agent-governor](https://www.npmjs.com/package/agent-governor) → **Settings → Trusted Publisher**:
+
+| Field | Value |
+| --- | --- |
+| Organization or user | `lihenair` |
+| Repository | `agent-governor` |
+| Workflow filename | `publish.yml` |
+| Environment name | leave empty |
+| Allowed actions | `npm publish` |
+
+Then for each release:
+
+```bash
+# on main, after the version bump is merged
+git tag v0.7.3
+git push origin v0.7.3
+```
+
+The tag must match `package.json` `version`. Do not `npm publish` from a laptop if you want provenance.
