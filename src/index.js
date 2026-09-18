@@ -19,7 +19,14 @@ export {
   initProject,
   mergeHookSettings,
   parseLangFlag,
+  parseHostsFlag,
 } from './init.js';
+export {
+  detectHosts,
+  formatDetectTable,
+  parseHostList,
+  resolveHostsToWire,
+} from './detect-hosts.js';
 
 /**
  * @typedef {Object} GovernorAstRules

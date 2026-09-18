@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { CONFIG, loadConfig, mergeConfig } from './config.js';
 import { formatValidationErrors, validateGovernorConfig } from './config-validate.js';
 import { explainConfig, formatTestReport, runDryTest } from './dry-run.js';
-import { initProject, parseLangFlag } from './init.js';
+import { initProject, parseDryRunFlag, parseHostsFlag, parseLangFlag, parseYesFlag } from './init.js';
 import { runHookGuard } from './dispatch.js';
 import { runPostToolUseGuard } from './post-tool-use.js';
 import { runPreToolUseGuard } from './pre-tool-use.js';
@@ -15,6 +15,12 @@ import { buildStatus, formatStatus } from './status.js';
 import { explainTarget } from './explain.js';
 import { formatAudit, gcAudit, queryAudit } from './audit/query.js';
 import { formatOutput, normalizeInput } from './hosts.js';
+import {
+  detectHosts,
+  formatDetectTable,
+  promptHostSelection,
+  resolveHostsToWire,
+} from './detect-hosts.js';
 import { getPreset } from './presets.js';
 import { emitBlock, exitAllow, exitBlock, readStdin } from './stdin.js';
 
@@ -51,8 +57,10 @@ Usage:
   npx agent-governor <command>
 
 Commands:
-  init [--lang auto|all|node|python|native]
-               Detect the stack and inject a single dispatcher hook
+  init [--lang auto|all|node|python|native] [--hosts <id,...>|all] [--yes] [--dry-run]
+               Detect installed coding agents and wire only the hosts you pick.
+               No host is default (including Claude Code). Empty selection
+               writes governor.config.json only.
   hook         Auto Pre/Post dispatcher (reads hook_event_name from stdin)
   pre-check    Run the PreToolUse guard (stdin JSON)
   post-check   Run the PostToolUse source guard (stdin JSON)
@@ -86,6 +94,10 @@ Options:
   --json       Machine-readable output for test
   --preset <name|a,b>
                Apply a policy pack: security-hard | frontend | python | strict
+  --hosts <id,...>|all
+               Hosts to wire (non-interactive). all = detected/present only.
+  --yes, -y    Skip the interactive prompt (still requires --hosts to wire)
+  --dry-run    Print detection and planned writes without changing files
 `;
 
 
@@ -152,10 +164,17 @@ function parseFlags(argv) {
       arg === '--rule' ||
       arg === '--session' ||
       arg === '--format' ||
-      arg === '--older-than'
+      arg === '--older-than' ||
+      arg === '--hosts'
     ) {
       flags[arg.slice(2)] = argv[index + 1];
       index += 1;
+    } else if (arg.startsWith('--hosts=')) {
+      flags.hosts = arg.slice('--hosts='.length);
+    } else if (arg === '--yes' || arg === '-y') {
+      flags.yes = true;
+    } else if (arg === '--dry-run') {
+      flags.dryRun = true;
     } else {
       flags._.push(arg);
     }
@@ -190,15 +209,56 @@ export async function runCli(argv = process.argv.slice(2)) {
 
   switch (command) {
     case 'init': {
-      const lang = parseLangFlag(argv.slice(1));
-      const preset = parseFlags(argv.slice(1)).preset;
-      const result = initProject(process.cwd(), { lang, preset });
+      try {
+      const rest = argv.slice(1);
+      const lang = parseLangFlag(rest);
+      const flags = parseFlags(rest);
+      const preset = flags.preset;
+      const projectRoot = process.cwd();
+      const detections = detectHosts(projectRoot);
+      process.stdout.write(formatDetectTable(detections));
+
+      let requested = parseHostsFlag(rest);
+      const yes = parseYesFlag(rest) || flags.yes;
+      const dryRun = parseDryRunFlag(rest) || flags.dryRun;
+      const interactive = Boolean(process.stdin.isTTY) && !yes && requested == null;
+
+      if (interactive) {
+        requested = await promptHostSelection(detections);
+      } else if (requested == null) {
+        requested = [];
+      }
+
+      const hosts = Array.isArray(requested)
+        ? requested
+        : resolveHostsToWire(detections, requested);
+
+      if (dryRun) {
+        process.stdout.write(
+          hosts.length > 0
+            ? `[Agent Governor] dry-run: would wire ${hosts.join(', ')}\n`
+            : '[Agent Governor] dry-run: no hosts selected (policy file only)\n'
+        );
+        exitAllow();
+        break;
+      }
+
+      const result = initProject(projectRoot, { lang, preset, hosts, detections });
+      const wired =
+        hosts.length > 0 ? `Wired hosts: ${hosts.join(', ')}` : 'No hosts wired (policy only)';
       process.stdout.write(
-        `[Agent Governor] Initialized for: ${result.langs.join(', ')}\n` +
-          result.created.map((file) => `  + ${file}`).join('\n') +
-          `\nShared policy: governor.config.json\n`
+        `[Agent Governor] Initialized for languages: ${result.langs.join(', ')}\n` +
+          `${wired}\n` +
+          (result.created.length > 0
+            ? result.created.map((file) => `  + ${file}`).join('\n') + '\n'
+            : '  (no new files)\n') +
+          `Shared policy: governor.config.json\n`
       );
       exitAllow();
+      } catch (err) {
+        emitBlock(`[Agent Governor] ${err.message}`);
+        process.exit(1);
+      }
       break;
     }
     case 'hook':

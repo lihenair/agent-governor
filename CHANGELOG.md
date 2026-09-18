@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-18
+
+### Changed
+
+- **`init` no longer defaults to Claude Code.** It detects which coding agents
+  look present (project dir, user config, PATH), prints a table, and wires
+  only the hosts you pick. Non-interactive runs write `governor.config.json`
+  only unless you pass `--hosts`. `--hosts all` means every *detected* host,
+  not every supported IDE. `--dry-run` prints the plan without writing.
+- Cursor is no longer given a default `.cursor/rules` file on `init`. Select
+  `cursor` to write `.cursor/hooks.json`.
+
+### Added
+
+- Host discovery (`detectHosts`) shared by `init` and `doctor`.
+- `init --hosts claude-code,cursor` / `--yes` / `--dry-run`.
+
 ## [0.7.5] - 2026-09-18
 
 ### Changed

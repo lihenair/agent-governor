@@ -6,20 +6,19 @@
  *
  *   1. Runtime: Node version, package integrity
  *   2. Config: governor.config.json parses, presets resolve
- *   3. Hooks: Claude Code settings.json actually references the governor
+ *   3. Hooks: detected coding agents that are actually wired to the governor
  *   4. State: audit log writable, self-protect hashes intact
  *   5. Policy: compiled rule count > 0, dry-run deny works
  */
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { loadConfig } from './config.js';
 import { compilePreToolPolicy } from './policy/rules.js';
 import { evaluatePreToolUse } from './pre-tool-use.js';
 import { AST_GREP_INSTALL, describeAstGrepRuntime } from './ast-grep-engine.js';
 import { runFile } from './run-file.js';
-
-const SETTINGS_CANDIDATES = ['.claude/settings.json', '.claude/settings.local.json'];
+import { hasPreset } from './presets.js';
+import { detectHosts } from './detect-hosts.js';
 
 function checkNodeVersion() {
   const major = Number(process.versions.node.split('.')[0]);
@@ -96,50 +95,51 @@ async function checkConfig(projectRoot) {
   }
 }
 
-function checkHooksInstalled(projectRoot) {
-  const found = [];
-  for (const rel of SETTINGS_CANDIDATES) {
-    const settingsPath = path.join(projectRoot, rel);
-    if (!fs.existsSync(settingsPath)) {
-      continue;
-    }
-    try {
-      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-      const hooks = settings.hooks || {};
-      const events = Object.keys(hooks);
-      const hasGovernor = JSON.stringify(hooks).includes('agent-governor');
-      found.push({ rel, events, hasGovernor });
-    } catch {
-      found.push({ rel, events: [], hasGovernor: false, broken: true });
-    }
-  }
-
-  const installed = found.filter((entry) => entry.hasGovernor);
-  if (installed.length > 0) {
-    const events = [...new Set(installed.flatMap((entry) => entry.events))];
+function checkHooksInstalled(projectRoot, options = {}) {
+  const detections = detectHosts(projectRoot, {
+    home: options.home,
+    env: options.env,
+    scanUser: options.scanUser,
+    scanPath: options.scanPath,
+    scope: options.scope,
+  });
+  const claudeSettings = path.join(projectRoot, '.claude', 'settings.json');
+  const claude = detections.find((row) => row.id === 'claude-code');
+  if (fs.existsSync(claudeSettings) && claude && claude.governed === 'no') {
     return {
       id: 'hooks-installed',
-      ok: true,
-      detail: `${installed.map((e) => e.rel).join(', ')} (${events.join(', ')})`,
+      ok: false,
+      detail: '.claude/settings.json exists but does not reference agent-governor',
+      fix: 'Run: npx agent-governor init --hosts claude-code',
     };
   }
 
-  // Plugin-based installs don't need settings.json; flag as warning, not failure.
-  if (found.length === 0) {
+  const governed = detections.filter((row) => row.governed !== 'no');
+  if (governed.length > 0) {
+    return {
+      id: 'hooks-installed',
+      ok: true,
+      detail: governed.map((row) => `${row.id} (${row.governed})`).join(', '),
+    };
+  }
+
+  const present = detections.filter((row) => row.presence !== 'absent');
+  if (present.length > 0) {
     return {
       id: 'hooks-installed',
       ok: true,
       warn: true,
-      detail: 'no .claude/settings.json found — running as a Claude Code plugin, or not installed',
-      fix: 'Install hooks with: npx agent-governor init   (or install the plugin: /plugin marketplace add lihenair/agent-governor)',
+      detail: `detected ${present.map((row) => row.id).join(', ')} but none are wired`,
+      fix: `Run: npx agent-governor init --hosts ${present.map((row) => row.id).join(',')}`,
     };
   }
 
   return {
     id: 'hooks-installed',
-    ok: false,
-    detail: 'settings.json exists but does not reference agent-governor',
-    fix: 'Run: npx agent-governor init',
+    ok: true,
+    warn: true,
+    detail: 'no coding-agent hosts detected or wired',
+    fix: 'Run: npx agent-governor init   then pick hosts from the table (or pass --hosts claude-code)',
   };
 }
 
@@ -244,12 +244,12 @@ async function checkAstGrep(projectRoot) {
  * @param {string} projectRoot
  * @returns {Promise<{ok:boolean, checks:Array, summary:string}>}
  */
-export async function runDoctor(projectRoot = process.cwd()) {
+export async function runDoctor(projectRoot = process.cwd(), options = {}) {
   const checks = [
     checkNodeVersion(),
     checkPackageIntegrity(),
     await checkConfig(projectRoot),
-    checkHooksInstalled(projectRoot),
+    checkHooksInstalled(projectRoot, options),
     checkAuditWritable(projectRoot),
     await checkDenyWorks(projectRoot),
     checkGitRepo(projectRoot),

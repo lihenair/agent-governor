@@ -128,7 +128,15 @@ npm install -D agent-governor   # 约 6 MB 落地（仅 @babel/parser）。ast-g
 npx agent-governor init
 ```
 
-`init` 会写入每个事件一条的分发 Hook（覆盖 JS/TS、Python、Rust、Go、Dart、Swift、Kotlin、Java、C/C++），外加读取扫描与会话重注入 Hook，生成 `governor.config.json`，并给 Cursor 写 `.cursor/rules/agent-governor.mdc` 软适配。生成的 Claude Code Hook：
+`init` 会探测本仓库 / 本机已有的 coding agent，列出一张表，**只接线你选中的宿主**。Claude Code 不是默认项。交互终端里手动勾选；CI / 无 TTY 时只写 `governor.config.json`，除非传入 `--hosts`。
+
+```bash
+npx agent-governor init --dry-run
+npx agent-governor init --hosts claude-code,cursor
+npx agent-governor init --hosts all          # 只覆盖已检测到的，不会凭空建六个 IDE 目录
+```
+
+选中 `claude-code` 后写入的分发 Hook：
 
 ```json
 {

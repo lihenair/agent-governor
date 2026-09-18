@@ -32,9 +32,13 @@ describe('init', () => {
     assert.equal(merged.hooks.PostToolUse.length, 1);
   });
 
-  it('writes .claude/settings.json and governor.config.json', () => {
+  it('writes .claude/settings.json only when claude-code is selected', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-init-'));
-    const result = initProject(tmp, { lang: 'node', packageRoot: repoRoot });
+    const result = initProject(tmp, {
+      lang: 'node',
+      packageRoot: repoRoot,
+      hosts: ['claude-code'],
+    });
     assert.ok(fs.existsSync(result.settingsPath));
     assert.ok(fs.existsSync(result.configPath));
     const settings = JSON.parse(fs.readFileSync(result.settingsPath, 'utf8'));
@@ -42,10 +46,22 @@ describe('init', () => {
     assert.ok(result.configPath.endsWith('governor.config.json'));
   });
 
+  it('does not create host dirs when no hosts are selected', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-init-none-'));
+    const result = initProject(tmp, { lang: 'node', packageRoot: repoRoot, hosts: [] });
+    assert.ok(fs.existsSync(result.configPath));
+    assert.equal(fs.existsSync(path.join(tmp, '.claude')), false);
+    assert.equal(fs.existsSync(path.join(tmp, '.cursor')), false);
+  });
+
   it('copies Python runtime and wires python hooks', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-py-'));
     fs.writeFileSync(path.join(tmp, 'pyproject.toml'), '[project]\nname="demo"\n');
-    const result = initProject(tmp, { lang: 'python', packageRoot: repoRoot });
+    const result = initProject(tmp, {
+      lang: 'python',
+      packageRoot: repoRoot,
+      hosts: ['claude-code'],
+    });
     assert.deepEqual(result.langs, ['python']);
     assert.ok(fs.existsSync(path.join(tmp, '.agent-governor/python/pre_tool_use.py')));
     assert.ok(fs.existsSync(path.join(tmp, '.agent-governor/python/post_tool_use.py')));
@@ -59,25 +75,62 @@ describe('init', () => {
 
   it('uses a single dispatcher hook for --lang all', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-all-'));
-    const result = initProject(tmp, { lang: 'all', packageRoot: repoRoot });
+    const result = initProject(tmp, {
+      lang: 'all',
+      packageRoot: repoRoot,
+      hosts: ['claude-code'],
+    });
     const settings = JSON.parse(fs.readFileSync(result.settingsPath, 'utf8'));
     assert.equal(settings.hooks.PreToolUse.length, 1);
     assert.equal(settings.hooks.PostToolUse.length, 1);
     assert.match(settings.hooks.PreToolUse[0].hooks[0].command, /pre-check/);
-    assert.ok(fs.existsSync(path.join(tmp, '.cursor/rules/agent-governor.mdc')));
+    assert.equal(fs.existsSync(path.join(tmp, '.cursor/rules/agent-governor.mdc')), false);
+  });
+
+  it('writes Cursor hooks.json when cursor is selected', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-cursor-'));
+    initProject(tmp, { lang: 'node', packageRoot: repoRoot, hosts: ['cursor'] });
+    const hooks = JSON.parse(fs.readFileSync(path.join(tmp, '.cursor/hooks.json'), 'utf8'));
+    assert.ok(JSON.stringify(hooks).includes('agent-governor'));
+    assert.ok(hooks.hooks.beforeShellExecution);
   });
 
   it('auto-detects a polyglot repo', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-poly-'));
     fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"demo"}');
     fs.writeFileSync(path.join(tmp, 'Cargo.toml'), '[package]\nname="demo"\n');
-    const result = initProject(tmp, { lang: 'auto', packageRoot: repoRoot });
+    const result = initProject(tmp, { lang: 'auto', packageRoot: repoRoot, hosts: ['claude-code'] });
     assert.ok(result.langs.includes('node'));
     assert.ok(result.langs.includes('native'));
     assert.ok(fs.existsSync(path.join(tmp, '.agent-governor/native/governor_guard.sh')));
     const settings = JSON.parse(fs.readFileSync(result.settingsPath, 'utf8'));
     assert.equal(settings.hooks.PreToolUse.length, 1);
     assert.match(settings.hooks.PreToolUse[0].hooks[0].command, /pre-check/);
+  });
+
+  it('CLI init without --hosts writes policy only', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-cli-init-'));
+    const result = runGovernor(['init'], { cwd: tmp });
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.ok(fs.existsSync(path.join(tmp, 'governor.config.json')));
+    assert.equal(fs.existsSync(path.join(tmp, '.claude')), false);
+    assert.match(result.stdout, /No hosts wired/);
+  });
+
+  it('CLI init --hosts claude-code wires Claude hooks', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-cli-claude-'));
+    const result = runGovernor(['init', '--hosts', 'claude-code'], { cwd: tmp });
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.ok(fs.existsSync(path.join(tmp, '.claude/settings.json')));
+    assert.match(result.stdout, /Wired hosts: claude-code/);
+  });
+
+  it('CLI init --dry-run does not write host files', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governor-cli-dry-'));
+    const result = runGovernor(['init', '--hosts', 'cursor', '--dry-run'], { cwd: tmp });
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.equal(fs.existsSync(path.join(tmp, '.cursor')), false);
+    assert.match(result.stdout, /dry-run/);
   });
 });
 

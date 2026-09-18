@@ -43,6 +43,16 @@ Decisions are emitted in each host's native contract:
 - **OpenCode**: the plugin shim exits non-zero and the plugin re-throws the
   reason, which OpenCode surfaces to the model
 
+`npx agent-governor init` prints a detection table and wires **only hosts you
+select**. There is no default host (including Claude Code).
+
+- Interactive TTY: pick comma-separated ids, `all` (detected/present only), or empty.
+- Non-interactive: pass `--hosts claude-code,cursor` (or `--hosts all`).
+  `--yes` alone does not wire anything.
+- `--dry-run` prints the plan without writing.
+
+Manual adapter copies below remain valid if you prefer to edit files yourself.
+
 ## Claude Code
 
 ```bash

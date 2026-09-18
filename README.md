@@ -128,7 +128,15 @@ npm install -D agent-governor   # ~6 MB unpacked (@babel/parser only). ast-grep 
 npx agent-governor init
 ```
 
-`init` writes a single dispatcher hook per event (covering JS/TS, Python, Rust, Go, Dart, Swift, Kotlin, Java, C/C++) plus read-scan and session re-injection hooks, generates `governor.config.json`, and adapts Cursor via `.cursor/rules/agent-governor.mdc`. The generated Claude Code hooks:
+`init` detects which coding agents look present (project config, user config, PATH), prints a table, and **wires only the hosts you pick**. Claude Code is not a default. In a terminal you choose from the list; in CI / non-TTY it writes `governor.config.json` only unless you pass `--hosts`.
+
+```bash
+npx agent-governor init --dry-run
+npx agent-governor init --hosts claude-code,cursor
+npx agent-governor init --hosts all          # every *detected* host, not every IDE
+```
+
+Selecting `claude-code` writes the dispatcher hooks:
 
 ```json
 {
@@ -167,7 +175,7 @@ npx agent-governor doctor
 ## 🧪 CLI
 
 ```bash
-npx agent-governor init [--lang auto|all|node|python|native] [--preset <name>]
+npx agent-governor init [--lang auto|all|node|python|native] [--preset <name>] [--hosts <id,...>|all] [--yes] [--dry-run]
 npx agent-governor hook                  # auto Pre/Post dispatcher (reads hook_event_name)
 npx agent-governor pre-check             # PreToolUse guard (stdin JSON)
 npx agent-governor post-check            # PostToolUse source + injection guard (stdin JSON)

@@ -1,7 +1,9 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG, toJsonConfig } from './config.js';
+import { parseHostList } from './detect-hosts.js';
 
 export const DEFAULT_HOOK_COMMANDS = {
   nodePre: 'npx agent-governor pre-check',
@@ -92,6 +94,25 @@ export function parsePresetFlag(argv = []) {
     ? argv[index].slice('--preset='.length)
     : argv[index + 1];
   return raw || undefined;
+}
+
+export function parseHostsFlag(argv = []) {
+  const index = argv.findIndex((arg) => arg === '--hosts' || arg.startsWith('--hosts='));
+  if (index === -1) {
+    return null;
+  }
+  const raw = argv[index].startsWith('--hosts=')
+    ? argv[index].slice('--hosts='.length)
+    : argv[index + 1];
+  return parseHostList(raw == null ? '' : raw);
+}
+
+export function parseYesFlag(argv = []) {
+  return argv.includes('--yes') || argv.includes('-y');
+}
+
+export function parseDryRunFlag(argv = []) {
+  return argv.includes('--dry-run');
 }
 
 export function parseLangFlag(argv = []) {
@@ -203,6 +224,139 @@ function copyRuntimeTree(fromDir, toDir, { mkdirSync, copyFileSync, chmodSync, e
   return created;
 }
 
+function readJsonFile(filePath, { existsSync, readFileSync }) {
+  if (!existsSync(filePath)) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8'));
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeJsonFile(filePath, value, writeFileSync) {
+  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function loadAdapter(packageRoot, name, readFileSync) {
+  return JSON.parse(readFileSync(path.join(packageRoot, 'adapters', name), 'utf8'));
+}
+
+/** Merge Claude-style { matcher, hooks: [{ command }] } groups. */
+function mergeHookEventMap(existing = {}, incoming = {}) {
+  const next = { ...existing };
+  for (const [eventName, groups] of Object.entries(incoming)) {
+    const current = Array.isArray(next[eventName]) ? [...next[eventName]] : [];
+    for (const group of groups) {
+      const already = current.some((item) => JSON.stringify(item).includes('agent-governor'));
+      if (!already) {
+        current.push(group);
+      }
+    }
+    next[eventName] = current;
+  }
+  return next;
+}
+
+function wireClaude({ cwd, langs, fsApi, created }) {
+  const { mkdirSync, existsSync, readFileSync, writeFileSync } = fsApi;
+  const settingsPath = path.join(cwd, '.claude', 'settings.json');
+  mkdirSync(path.dirname(settingsPath), { recursive: true });
+  const existing = readJsonFile(settingsPath, fsApi);
+  const merged = mergeHookSettings(existing, langs);
+  writeJsonFile(settingsPath, merged, writeFileSync);
+  created.push(path.relative(cwd, settingsPath));
+  return settingsPath;
+}
+
+function wireCursor({ cwd, packageRoot, fsApi, created }) {
+  const { mkdirSync, existsSync, readFileSync, writeFileSync } = fsApi;
+  const hooksPath = path.join(cwd, '.cursor', 'hooks.json');
+  mkdirSync(path.dirname(hooksPath), { recursive: true });
+  const adapter = loadAdapter(packageRoot, 'cursor-hooks.json', readFileSync);
+  const existing = readJsonFile(hooksPath, { existsSync, readFileSync });
+  const merged = {
+    ...existing,
+    ...adapter,
+    hooks: mergeHookEventMap(existing.hooks || {}, adapter.hooks || {}),
+  };
+  if (adapter.version != null) {
+    merged.version = existing.version ?? adapter.version;
+  }
+  writeJsonFile(hooksPath, merged, writeFileSync);
+  created.push(path.relative(cwd, hooksPath));
+}
+
+function wireCodex({ cwd, home, packageRoot, fsApi, created, detections }) {
+  const { mkdirSync, existsSync, readFileSync, writeFileSync } = fsApi;
+  const row = detections.find((item) => item.id === 'codex');
+  const projectDir = path.join(cwd, '.codex');
+  const useProject = row?.presence === 'project' || existsSync(projectDir);
+  const target = useProject
+    ? path.join(projectDir, 'hooks.json')
+    : path.join(home, '.codex', 'hooks.json');
+  mkdirSync(path.dirname(target), { recursive: true });
+  const adapter = loadAdapter(packageRoot, 'codex-hooks.json', readFileSync);
+  const existing = readJsonFile(target, { existsSync, readFileSync });
+  const merged = {
+    ...existing,
+    ...adapter,
+    hooks: mergeHookEventMap(existing.hooks || {}, adapter.hooks || {}),
+  };
+  writeJsonFile(target, merged, writeFileSync);
+  created.push(useProject ? path.relative(cwd, target) : target);
+}
+
+function wireGemini({ cwd, home, packageRoot, fsApi, created, detections }) {
+  const { mkdirSync, existsSync, readFileSync, writeFileSync } = fsApi;
+  const row = detections.find((item) => item.id === 'gemini-cli');
+  const projectDir = path.join(cwd, '.gemini');
+  const useProject = row?.presence === 'project' || existsSync(projectDir);
+  const target = useProject
+    ? path.join(projectDir, 'settings.json')
+    : path.join(home, '.gemini', 'settings.json');
+  mkdirSync(path.dirname(target), { recursive: true });
+  const adapter = loadAdapter(packageRoot, 'gemini-settings-hooks.json', readFileSync);
+  const existing = readJsonFile(target, { existsSync, readFileSync });
+  const merged = {
+    ...existing,
+    hooks: mergeHookEventMap(existing.hooks || {}, adapter.hooks || {}),
+  };
+  writeJsonFile(target, merged, writeFileSync);
+  created.push(useProject ? path.relative(cwd, target) : target);
+}
+
+function wireWindsurf({ cwd, home, packageRoot, fsApi, created, detections }) {
+  const { mkdirSync, existsSync, readFileSync, writeFileSync } = fsApi;
+  const row = detections.find((item) => item.id === 'windsurf');
+  const projectDir = path.join(cwd, '.windsurf');
+  const useProject = row?.presence === 'project' || existsSync(projectDir);
+  const target = useProject
+    ? path.join(projectDir, 'hooks.json')
+    : path.join(home, '.codeium', 'windsurf', 'hooks.json');
+  mkdirSync(path.dirname(target), { recursive: true });
+  const adapter = loadAdapter(packageRoot, 'windsurf-hooks.json', readFileSync);
+  const existing = readJsonFile(target, { existsSync, readFileSync });
+  const merged = {
+    ...existing,
+    hooks: mergeHookEventMap(existing.hooks || {}, adapter.hooks || {}),
+  };
+  writeJsonFile(target, merged, writeFileSync);
+  created.push(useProject ? path.relative(cwd, target) : target);
+}
+
+function wireOpencode({ cwd, packageRoot, fsApi, created }) {
+  const { mkdirSync, existsSync, copyFileSync } = fsApi;
+  const target = path.join(cwd, '.opencode', 'plugins', 'agent-governor.js');
+  mkdirSync(path.dirname(target), { recursive: true });
+  if (!existsSync(target)) {
+    copyFileSync(path.join(packageRoot, 'adapters', 'opencode-plugin.js'), target);
+    created.push(path.relative(cwd, target));
+  }
+}
+
 export function initProject(
   cwd = process.cwd(),
   {
@@ -215,29 +369,17 @@ export function initProject(
     lang = 'auto',
     preset,
     packageRoot = findPackageRoot(),
+    hosts = [],
+    detections = [],
+    home = os.homedir(),
   } = {}
 ) {
   const langs = resolveLanguages(lang, cwd, existsSync);
-  const claudeDir = path.join(cwd, '.claude');
   const agentDir = path.join(cwd, '.agent-governor');
-  const settingsPath = path.join(claudeDir, 'settings.json');
   const configPath = path.join(cwd, 'governor.config.json');
   const created = [];
-
-  mkdirSync(claudeDir, { recursive: true });
-
-  let existing = {};
-  if (existsSync(settingsPath)) {
-    try {
-      existing = JSON.parse(readFileSync(settingsPath, 'utf8'));
-    } catch {
-      existing = {};
-    }
-  }
-
-  const merged = mergeHookSettings(existing, langs);
-  writeFileSync(settingsPath, `${JSON.stringify(merged, null, 2)}\n`);
-  created.push(path.relative(cwd, settingsPath));
+  const selected = new Set(hosts || []);
+  const fsApi = { writeFileSync, mkdirSync, existsSync, readFileSync, copyFileSync, chmodSync };
 
   if (!existsSync(configPath)) {
     // With --preset, write a minimal config referencing the pack instead of
@@ -274,16 +416,25 @@ export function initProject(
     created.push(...copied.map((file) => path.relative(cwd, file)));
   }
 
-  const cursorRuleSource = path.join(packageRoot, 'adapters', 'cursor-rule.mdc');
-  if (existsSync(cursorRuleSource)) {
-    const cursorDir = path.join(cwd, '.cursor', 'rules');
-    mkdirSync(cursorDir, { recursive: true });
-    const cursorRulePath = path.join(cursorDir, 'agent-governor.mdc');
-    if (!existsSync(cursorRulePath)) {
-      copyFileSync(cursorRuleSource, cursorRulePath);
-      created.push(path.relative(cwd, cursorRulePath));
-    }
+  let settingsPath = path.join(cwd, '.claude', 'settings.json');
+  if (selected.has('claude-code')) {
+    settingsPath = wireClaude({ cwd, langs, fsApi, created });
+  }
+  if (selected.has('cursor')) {
+    wireCursor({ cwd, packageRoot, fsApi, created });
+  }
+  if (selected.has('codex')) {
+    wireCodex({ cwd, home, packageRoot, fsApi, created, detections });
+  }
+  if (selected.has('gemini-cli')) {
+    wireGemini({ cwd, home, packageRoot, fsApi, created, detections });
+  }
+  if (selected.has('windsurf')) {
+    wireWindsurf({ cwd, home, packageRoot, fsApi, created, detections });
+  }
+  if (selected.has('opencode')) {
+    wireOpencode({ cwd, packageRoot, fsApi, created });
   }
 
-  return { settingsPath, configPath, created, langs };
+  return { settingsPath, configPath, created, langs, hosts: [...selected] };
 }
