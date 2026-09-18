@@ -47,6 +47,7 @@ AI 编程 Agent 很快，但存在**非确定性与上下文漂移**：
 | **读取侧注入扫描** | ✅ **Agent 读到什么也检查** | ❌ 只管写入侧 |
 | 压缩后规则重注入 | ✅ SessionStart / PreCompact 钩子 | ❌ 规则跟着上下文一起被压掉 |
 | 团队策略漂移检测 | ✅ `governor status` 对比提交基线 | ❌ |
+| **安装时自选宿主** | ✅ `init` 发现已装的 agent，由你决定接哪些 | ❌ 默认只接一个 IDE |
 | 自审计（脱敏） | ✅ `.agent-governor/audit.log` | 各不相同 |
 
 ### 护栏检查项
@@ -113,6 +114,8 @@ flowchart LR
 
 ## 📦 快速开始
 
+**0.8.0：** `init` 不再默认当成你在用 Claude Code。它会列出本机/本仓库里发现的 agent，由你选接哪些。
+
 **方式 A——Claude Code 插件（零配置）：**
 
 ```bash
@@ -124,7 +127,7 @@ flowchart LR
 **方式 B——npm：**
 
 ```bash
-npm install -D agent-governor   # 约 6 MB 落地（仅 @babel/parser）。ast-grep 按需安装。
+npm install -D agent-governor@0.8.0   # 约 6 MB 落地（仅 @babel/parser）。ast-grep 按需安装。
 npx agent-governor init
 ```
 
@@ -168,7 +171,7 @@ npx agent-governor doctor
 # → all checks passed（运行时、配置、Hook、审计、实弹拦截演练）
 ```
 
-**Codex CLI / Gemini CLI / Cursor / Windsurf / OpenCode 配置：** 见 [docs/hosts.md](./docs/hosts.md)——适配器配置与 OpenCode 插件随 npm 包分发（`adapters/` 目录）。
+**Codex CLI / Gemini CLI / Cursor / Windsurf / OpenCode：** 在 `init` 的表里选中即可接线。手动拷适配器见 [docs/hosts.md](./docs/hosts.md)。
 
 ---
 

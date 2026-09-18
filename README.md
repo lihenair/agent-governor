@@ -47,6 +47,7 @@ AI coding agents are incredibly fast, but they suffer from **non-determinism and
 | **Read-side injection scanning** | ✅ **what the agent reads is scanned too** | ❌ write-side only |
 | Rule re-injection after compaction | ✅ SessionStart / PreCompact hooks | ❌ rules get compacted away |
 | Team policy drift detection | ✅ `governor status` vs committed baseline | ❌ |
+| **Install: pick your agents** | ✅ `init` detects installed hosts; you choose what to wire | ❌ default one IDE |
 | Self-audit with redaction | ✅ `.agent-governor/audit.log` | varies |
 
 ### Guardrail checks
@@ -113,6 +114,8 @@ Fail-open on internal errors (a governor bug must not freeze the agent loop), fa
 
 ## 📦 Quick Start
 
+**0.8.0:** `init` no longer assumes Claude Code. It lists agents it finds on this machine/repo; you pick which ones to wire.
+
 **Option A — Claude Code plugin (zero config):**
 
 ```bash
@@ -124,7 +127,7 @@ Fail-open on internal errors (a governor bug must not freeze the agent loop), fa
 **Option B — npm:**
 
 ```bash
-npm install -D agent-governor   # ~6 MB unpacked (@babel/parser only). ast-grep is opt-in.
+npm install -D agent-governor@0.8.0   # ~6 MB unpacked (@babel/parser only). ast-grep is opt-in.
 npx agent-governor init
 ```
 
@@ -168,7 +171,7 @@ npx agent-governor doctor
 # → all checks passed (runtime, config, hooks, audit, live deny dry-run)
 ```
 
-**Codex CLI / Gemini CLI / Cursor / Windsurf / OpenCode setup:** see [docs/hosts.md](./docs/hosts.md) — adapter configs and the OpenCode plugin ship in the npm package (`adapters/`).
+**Codex CLI / Gemini CLI / Cursor / Windsurf / OpenCode:** `init` can wire them when you select those hosts (see the detection table). Manual adapter copies: [docs/hosts.md](./docs/hosts.md).
 
 ---
 

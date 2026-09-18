@@ -19,9 +19,10 @@ npm test
 | `src/dispatch.js` | `hook` command (Pre vs Post via `hook_event_name`) |
 | `src/pre-tool-use.js` | Config shield, bash safety, pre-write source policy |
 | `src/post-tool-use.js` | On-disk source policy after Write/Edit |
+| `src/detect-hosts.js` | Discover installed coding agents for `init` / `doctor` |
 | `python/` | Optional stdlib-`ast` runtime (`--lang python`) |
 | `native/` | Optional Bash fallback |
-| `adapters/cursor-rule.mdc` | Soft Cursor rule copied by `init` |
+| `adapters/` | Per-host hook snippets (`init --hosts` merges these) |
 | `bin/governor.js` | CLI |
 
 ## Pull requests
@@ -53,8 +54,8 @@ Then for each release:
 
 ```bash
 # on main, after the version bump is merged
-git tag v0.7.3
-git push origin v0.7.3
+git tag v0.8.0
+git push origin v0.8.0
 ```
 
 The tag must match `package.json` `version`. Do not `npm publish` from a laptop if you want provenance.

@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Host discovery (`detectHosts`) shared by `init` and `doctor`.
 - `init --hosts claude-code,cursor` / `--yes` / `--dry-run`.
 
+### Docs
+
+- README / README_ZH document the 0.8.0 host picker (`init` does not default to Claude).
+
 ## [0.7.5] - 2026-09-18
 
 ### Changed

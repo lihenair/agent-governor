@@ -7,7 +7,7 @@ description: Set up Agent Governor for the current project: verify the hook runt
 Set up Agent Governor for the current project. Your goal is to:
 
 1. Verify the runtime works
-2. Generate a starter config if none exists
+2. Generate a starter config and wire hosts the user actually uses
 3. Run the doctor self-check
 4. Prove enforcement works with a live dry-run
 
@@ -23,15 +23,17 @@ npx agent-governor version
 
 If this fails, tell the user to install Node.js 18+.
 
-### 2. Generate starter config
+### 2. Generate starter config and pick hosts
 
-If `governor.config.json` does not exist in the project root, create it:
+Ask which coding agents this project should protect (`claude-code`, `cursor`, `codex`, `gemini-cli`, `windsurf`, `opencode`). Then run `init` with those hosts so hooks are not guessed:
 
 ```bash
-npx agent-governor init
+npx agent-governor init --hosts claude-code,cursor
 ```
 
-If it exists, leave it alone and note that the user's config is preserved.
+If `governor.config.json` already exists, `init` will leave it alone and only merge hooks for the selected hosts.
+
+`npx agent-governor init` with no `--hosts` is interactive in a TTY (prints a detection table, then asks). In CI it writes policy only unless `--hosts` is passed.
 
 ### 3. Ask about presets
 
