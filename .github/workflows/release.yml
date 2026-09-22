@@ -1,0 +1,69 @@
+name: GitHub Release
+
+# Creates the GitHub Release for the current package version from CHANGELOG.md
+# notes, and tidies up orphaned draft releases. Idempotent: it only creates a
+# release when the matching tag exists and no release is present yet.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Create GitHub Release for current version (if missing)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(jq -r .version package.json)"
+          TAG="v${VERSION}"
+
+          if ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag ${TAG} does not exist yet; nothing to release."
+            exit 0
+          fi
+
+          if gh release view "${TAG}" --json tagName >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists; nothing to do."
+            exit 0
+          fi
+
+          NOTES="$(awk -v ver="${VERSION}" '
+            $0 ~ "^## \\[" ver "\\]" { cap=1; next }
+            cap && /^## \[/ { cap=0 }
+            cap { print }
+          ' CHANGELOG.md)"
+
+          if [ -z "${NOTES//[[:space:]]/}" ]; then
+            NOTES="Release ${TAG}"
+          fi
+
+          echo "Creating release ${TAG}"
+          printf '%s\n' "${NOTES}" | gh release create "${TAG}" \
+            --verify-tag --latest --title "${TAG}" --notes-file -
+
+      - name: Remove orphaned draft releases (draft with no matching tag)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release list --limit 100 --json tagName,isDraft \
+            --jq '.[] | select(.isDraft) | .tagName' | while read -r t; do
+            [ -n "${t}" ] || continue
+            if ! git rev-parse -q --verify "refs/tags/${t}" >/dev/null; then
+              echo "Deleting orphaned draft release ${t}"
+              gh release delete "${t}" --yes
+            fi
+          done
