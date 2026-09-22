@@ -27,11 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Docs
 
 - README / README_ZH document the 0.8.0 host picker (`init` does not default to Claude).
-
-## [0.7.5] - 2026-09-18
-
-### Changed
-
 - README install size and runtime graph match 0.7.4 (`@babel/parser` only, ~6 MB
   unpacked / ~75 kB tarball). Capability tag names match the engine.
 
